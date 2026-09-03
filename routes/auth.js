@@ -4,15 +4,23 @@ const { validate, asyncHandler } = require('../middleware/http');
 const { registerSchema, loginSchema } = require('../shared/schemas/auth');
 const { hashPassword, generateToken } = require('../utils/auth');
 const { isAdminEmail } = require('../utils/adminEmails');
+const { makeRateLimiter } = require('../utils/rateLimit');
 const requireAuth = require('../middleware/auth');
 const registrationGate = require('../middleware/registrationGate');
 const prisma = require('../db');
 
 const router = express.Router();
 
+// In-memory rate limiters, keyed per-IP with separate buckets so login
+// retries don't share state with account-creation attempts. See
+// utils/rateLimit.js for trade-offs (single-process state).
+const rateLimitLogin = makeRateLimiter({ keyPrefix: 'login', max: 10 });
+const rateLimitRegister = makeRateLimiter({ keyPrefix: 'register', max: 5 });
+
 // REGISTER — POST /auth/register
 router.post(
   '/register',
+  rateLimitRegister,
   registrationGate,
   validate(registerSchema),
   asyncHandler(async (req, res) => {
@@ -58,6 +66,7 @@ router.post(
 // LOGIN — POST /auth/login
 router.post(
   '/login',
+  rateLimitLogin,
   validate(loginSchema),
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
