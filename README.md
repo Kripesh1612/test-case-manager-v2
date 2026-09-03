@@ -106,12 +106,12 @@ admin, set `ADMIN_EMAILS="you@example.com"` in your `.env` (see
 
 ```bash
 npm run cy:open        # interactive
-npm run cy:run         # headless, full suite (167 tests)
-npm run cy:run:api     # 98 API-level tests only
-npm run cy:run:ui      # 63 UI-level tests only
+npm run cy:run         # headless, full suite (211 tests)
+npm run cy:run:api     # 125 API-level tests only
+npm run cy:run:ui      # 80 UI-level tests only
 ```
 
-All 167 tests should be green. Walk through them in
+All 211 tests should be green. Walk through them in
 [`docs/learning-path.md`](./docs/learning-path.md) for the recommended order.
 
 ## Docs
@@ -138,8 +138,8 @@ All 167 tests should be green. Walk through them in
 postman/        — Postman collection + environment
 cypress/
   e2e/
-    api/        — 98 contract tests (no browser)
-    ui/         — 63 end-to-end tests (real browser)
+    api/        — 125 contract tests (no browser)
+    ui/         — 80 end-to-end tests (real browser)
     06-advanced-patterns.cy.js  — cy.intercept() + cy.fixture() demos
   fixtures/     — sample JSON used by the advanced spec
   support/      — custom Cypress commands
@@ -161,7 +161,7 @@ docs/           — the learning resource this README links to
 - [x] Postman collection (with pre-request scripts)
 - [x] Vanilla-JS UI in `public/`
 - [x] RBAC (admin / editor / viewer) — enforced on server *and* UI
-- [x] Cypress — 191 tests across API + UI
+- [x] Cypress — 211 tests across API + UI
 - [x] Advanced Cypress patterns — `cy.intercept()` + `cy.fixture()`
 - [x] Docs that read like a curriculum
 - [x] Docker + env config

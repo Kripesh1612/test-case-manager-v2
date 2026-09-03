@@ -1,6 +1,6 @@
 # Test Case Manager — CI
 #
-# Runs the full Cypress suite (145 tests) on every push to main and on every
+# Runs the full Cypress suite (211 tests) on every push to main and on every
 # pull request. Boots a Postgres service container, applies migrations, starts
 # the app, then runs Cypress against it.
 #
