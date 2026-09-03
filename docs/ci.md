@@ -40,7 +40,7 @@ GitHub-hosted `ubuntu-latest` runner.
 ## Watching a run
 
 Go to
-[`Actions`](https://github.com/Kripesh1612/test-case-manager/actions) on
+[`Actions`](https://github.com/Kripesh1612/test-case-manager-v2/actions) on
 GitHub. Each run shows:
 
 | Step                | Time     | Notes                                            |
