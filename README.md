@@ -143,10 +143,12 @@ cypress/
     06-advanced-patterns.cy.js  — cy.intercept() + cy.fixture() demos
   fixtures/     — sample JSON used by the advanced spec
   support/      — custom Cypress commands
-public/         — vanilla-JS UI (HTML + JS + CSS, no framework)
+client/         — React + Vite + TypeScript UI (primary)
+public/         — legacy vanilla-JS files (only invite-redeem.html is live)
 routes/         — Express routers (auth, testCases, testSuites, users, …)
 middleware/     — auth + RBAC + http helpers + scheduler loop
 prisma/         — schema + Postgres migrations (data lives in Docker volume)
+shared/         — Zod schemas shared between client and server
 utils/          — small helpers (admin emails, serialization, cron parser, …)
 docs/           — the learning resource this README links to
 ```
