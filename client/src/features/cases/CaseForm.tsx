@@ -16,7 +16,12 @@ import { testCaseSchema } from '@shared/schemas/testCase';
 import type { CaseData } from './api';
 import { TagInput } from './TagInput';
 
-type FormValues = z.infer<typeof testCaseSchema>;
+// testCaseSchema has a `.transform()` on executable_snippet (collapses '' to
+// null), which means `z.infer` gives the OUTPUT type (`string | null`) but
+// the form state holds the INPUT type (`string | null | undefined`). Pin
+// both so RHF's resolver and submit handler line up.
+type FormValues = z.infer<typeof testCaseSchema>;     // submit-handler type (output)
+type FormInput = z.input<typeof testCaseSchema>;     // form-state type (input)
 
 interface CaseFormProps {
   initial?: CaseData;
@@ -33,7 +38,7 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormValues>({
+  } = useForm<FormInput, undefined, FormValues>({
     resolver: zodResolver(testCaseSchema),
     defaultValues: {
       title: initial?.title ?? '',
