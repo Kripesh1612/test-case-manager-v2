@@ -1,3 +1,5 @@
+> **Note:** This is a **v2 rewrite** of [test-case-manager](https://github.com/Kripesh1612/test-case-manager) — an old project I originally built myself. The git history in this repo starts fresh on 2026-09-03; the original commits live in the upstream repo linked above.
+
 # Test Case Manager
 
 [![CI](https://github.com/Kripesh1612/test-case-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/Kripesh1612/test-case-manager/actions/workflows/ci.yml)
