@@ -4,6 +4,10 @@ const { validate, asyncHandler } = require('../middleware/http');
 const { registerSchema, loginSchema } = require('../shared/schemas/auth');
 const { hashPassword, generateToken } = require('../utils/auth');
 const { isAdminEmail } = require('../utils/adminEmails');
+const {
+  getRateLimitLoginMax,
+  getRateLimitRegisterMax,
+} = require('../utils/settings');
 const { makeRateLimiter } = require('../utils/rateLimit');
 const requireAuth = require('../middleware/auth');
 const registrationGate = require('../middleware/registrationGate');
@@ -12,10 +16,17 @@ const prisma = require('../db');
 const router = express.Router();
 
 // In-memory rate limiters, keyed per-IP with separate buckets so login
-// retries don't share state with account-creation attempts. See
-// utils/rateLimit.js for trade-offs (single-process state).
-const rateLimitLogin = makeRateLimiter({ keyPrefix: 'login', max: 10 });
-const rateLimitRegister = makeRateLimiter({ keyPrefix: 'register', max: 5 });
+// retries don't share state with account-creation attempts. Caps are
+// env-tunable via RATE_LIMIT_LOGIN_MAX / RATE_LIMIT_REGISTER_MAX; see
+// utils/settings.js for the defaults and rationale.
+const rateLimitLogin = makeRateLimiter({
+  keyPrefix: 'login',
+  max: getRateLimitLoginMax(),
+});
+const rateLimitRegister = makeRateLimiter({
+  keyPrefix: 'register',
+  max: getRateLimitRegisterMax(),
+});
 
 // REGISTER — POST /auth/register
 router.post(

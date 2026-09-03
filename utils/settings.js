@@ -56,6 +56,25 @@ const getTrashRetentionDays = () => {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_TRASH_RETENTION_DAYS;
 };
 
+// --- Rate limit caps (requests per 60s window per IP) ---
+//
+// Defaults are deliberately generous so the Cypress suite isn't tripped
+// during a fast CI run. For production deployments, tighten via env:
+//   RATE_LIMIT_LOGIN_MAX=10      RATE_LIMIT_REGISTER_MAX=3
+
+const DEFAULT_RATE_LIMIT_LOGIN_MAX = 30;
+const DEFAULT_RATE_LIMIT_REGISTER_MAX = 30;
+
+const getRateLimitLoginMax = () => {
+  const n = parseInt(process.env.RATE_LIMIT_LOGIN_MAX, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RATE_LIMIT_LOGIN_MAX;
+};
+
+const getRateLimitRegisterMax = () => {
+  const n = parseInt(process.env.RATE_LIMIT_REGISTER_MAX, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RATE_LIMIT_REGISTER_MAX;
+};
+
 // --- Audit enabled? ---
 
 const isAuditEnabled = () =>
@@ -68,5 +87,7 @@ module.exports = {
   getRegistrationMode,
   getInviteTtlDays,
   getTrashRetentionDays,
+  getRateLimitLoginMax,
+  getRateLimitRegisterMax,
   isAuditEnabled,
 };
