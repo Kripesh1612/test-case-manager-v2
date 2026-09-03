@@ -3,7 +3,7 @@ const { defineConfig } = require('cypress');
 module.exports = defineConfig({
   e2e: {
     // The API + UI both run on this port (matches PORT in the server).
-    baseUrl: 'http://localhost:3002',
+    baseUrl: 'http://localhost:3001',
 
     // Where Cypress looks for specs.
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
