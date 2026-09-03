@@ -11,7 +11,7 @@
 //     <button data-cy="toast-action">Open Trash</button>   (optional)
 //   </div>
 
-export type ToastVariant = 'success' | 'error';
+export type ToastVariant = 'success' | 'warning' | 'error';
 
 export interface ToastAction {
   label: string;
