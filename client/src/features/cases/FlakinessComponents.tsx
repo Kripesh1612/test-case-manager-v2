@@ -117,7 +117,7 @@ export function FlakinessPanel({ caseId }: FlakinessPanelProps) {
           <h3 className="text-sm font-semibold text-gray-900">Flakiness</h3>
         </div>
         <Link
-          to={`/cases?q=flaky`}
+          to={`/cases?verdict=flaky`}
           data-cy="flakiness-see-all"
           className="text-xs font-medium text-blue-600 hover:underline"
         >
