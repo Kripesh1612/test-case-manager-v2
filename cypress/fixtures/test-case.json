@@ -1,0 +1,13 @@
+{
+  "title": "Login with valid credentials",
+  "description": "User can sign in and reach the cases page",
+  "steps": [
+    "Open /login",
+    "Enter a registered email + password",
+    "Click 'Sign in'"
+  ],
+  "expected_result": "Redirect to /cases with profile menu visible",
+  "status": "active",
+  "priority": "high",
+  "tags": ["smoke", "auth"]
+}

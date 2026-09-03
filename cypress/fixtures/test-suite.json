@@ -1,0 +1,5 @@
+{
+  "name": "Auth regression suite",
+  "description": "All tests that touch authentication or the login flow",
+  "test_case_ids": []
+}

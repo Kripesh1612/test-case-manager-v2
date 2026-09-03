@@ -1,0 +1,59 @@
+# Test Case Manager — `docker compose up` brings up Postgres + the Node app.
+#
+# Override any of the env vars below by exporting them in your shell before
+# running compose, or by editing this file. The defaults are safe for local
+# development; change JWT_SECRET before exposing the app to a network.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tcm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tcm
+      POSTGRES_PASSWORD: tcm
+      POSTGRES_DB: tcm
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      # Host port 5433 — the apt-installed Postgres still owns 5432 on this
+      # machine. Inside the Docker network the service is still reachable
+      # on 5432 (the app container uses the compose-internal DNS name).
+      - "5433:5432"
+    volumes:
+      - tcm-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tcm -d tcm"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tcm-app
+    restart: unless-stopped
+    # Wait for Postgres to pass its healthcheck before the app starts. The
+    # entrypoint script also runs `prisma migrate deploy` which will fail
+    # fast if Postgres goes away later — that surfaces issues immediately
+    # instead of letting them hide behind connection retries.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # The app talks to Postgres via the compose-internal DNS name `postgres`,
+      # not localhost (which would resolve to the app container itself).
+      DATABASE_URL: postgresql://tcm:tcm@postgres:5432/tcm?schema=public
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-set-this-in-prod}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-cypress-admin@tcm.com,admin@tcm.com}
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-open}
+      INVITE_TTL_DAYS: ${INVITE_TTL_DAYS:-7}
+      TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
+      AUDIT_ENABLED: ${AUDIT_ENABLED:-true}
+    ports:
+      - "3001:3001"
+
+volumes:
+  tcm-postgres-data:

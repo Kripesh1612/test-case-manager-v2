@@ -1,0 +1,48 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Env + secrets — injected at runtime via docker-compose, never baked in
+.env
+.env.local
+.env.*.local
+
+# Local SQLite (we use Postgres in Docker)
+prisma/dev.db
+prisma/dev.db-journal
+
+# Cypress + tests aren't needed in the runtime image
+cypress/videos
+cypress/screenshots
+cypress/reports
+
+# Git + IDE noise
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Logs + dumps
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage
+.nyc_output
+
+# Don't copy the Dockerfile itself or compose file into the image
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# This very file's siblings
+README.md
+docs

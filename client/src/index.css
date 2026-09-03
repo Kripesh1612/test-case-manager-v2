@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* =============================================================================
+ * Vanilla CSS the existing Cypress UI tests rely on. Tailwind doesn't
+ * replace these — they were in public/styles.css and the tests query
+ * by class name (e.g. `.role-pill.role-admin`).
+ * ========================================================================== */
+
+.role-pill {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.role-pill.role-admin {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+.role-pill.role-editor {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+.role-pill.role-viewer {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+.role-pill.role-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+.role-pill.role-accepted {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+.role-pill.role-expired {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* RBAC: viewers can't write. The `data-writable` attribute marks any
+ * element that should disappear for viewers. The Shell component
+ * applies `role-viewer` to the root element when the logged-in user has
+ * the viewer role, so this single rule hides all write surfaces. */
+.role-viewer [data-writable="true"] {
+  display: none !important;
+}
+
+/* Match the public/styles.css `.btn.small` look on the admin page
+ * select + delete buttons so the existing role-pill + button
+ * appearance is consistent. */
+button.btn {
+  cursor: pointer;
+}
+button.btn.small {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  border: 1px solid #d1d5db;
+  background: white;
+}
+button.btn.small:hover:not(:disabled) {
+  background: #f9fafb;
+}
+button.btn.small.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+button.btn.small.danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+button.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

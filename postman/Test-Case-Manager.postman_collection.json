@@ -1,0 +1,1019 @@
+{
+  "info": {
+    "_postman_id": "tcm-collection-0001",
+    "name": "Test Case Manager API",
+    "description": "End-to-end test collection for the Test Case Manager REST API. Auto-registers a user and creates fixtures on demand — every request can be run individually or as a collection run.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Collection-level: ensure we have a valid token. If not, register a fresh user.",
+          "if (!pm.environment.get('token')) {",
+          "  return new Promise((resolve, reject) => {",
+          "    const email = 'qa-' + Date.now() + '@example.com';",
+          "    pm.environment.set('userEmail', email);",
+          "    pm.sendRequest({",
+          "      url: pm.environment.get('baseUrl') + '/auth/register',",
+          "      method: 'POST',",
+          "      header: { 'Content-Type': 'application/json' },",
+          "      body: { mode: 'raw', raw: JSON.stringify({ email: email, password: 'hunter22', name: 'QA Bot' }) }",
+          "    }, (err, res) => {",
+          "      if (err) return reject(err);",
+          "      if (res.code === 201) {",
+          "        const json = res.json();",
+          "        pm.environment.set('token', json.token);",
+          "        pm.environment.set('userId', json.user.id);",
+          "      }",
+          "      resolve();",
+          "    });",
+          "  });",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "var json = pm.response.json();",
+                  "pm.test('Has token', () => pm.expect(json.token).to.be.a('string'));",
+                  "pm.test('Has user object', () => pm.expect(json.user).to.be.an('object'));",
+                  "pm.environment.set('token', json.token);",
+                  "pm.environment.set('userId', json.user.id);",
+                  "pm.environment.set('userEmail', json.user.email);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"qa-{{$timestamp}}@example.com\",\n  \"password\": \"hunter22\",\n  \"name\": \"QA Bot\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Returns a token', () => pm.expect(json.token).to.be.a('string'));",
+                  "pm.environment.set('token', json.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"hunter22\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Me (requires token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Returns user object', () => pm.expect(json.user).to.be.an('object'));",
+                  "pm.test('Email matches', () => pm.expect(json.user.email).to.eql(pm.environment.get('userEmail')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}" }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Validation: invalid email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "var json = pm.response.json();",
+                  "pm.test('Error is Validation failed', () => pm.expect(json.error).to.eql('Validation failed'));",
+                  "pm.test('Has details array', () => pm.expect(json.details).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"hunter22\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Validation: short password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"valid@example.com\",\n  \"password\": \"abc\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Auth fail: wrong password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Auth fail: no token on /auth/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Cases",
+      "item": [
+        {
+          "name": "Create test case (protected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "var json = pm.response.json();",
+                  "pm.test('Has id', () => pm.expect(json.id).to.be.a('number'));",
+                  "pm.test('Title is a string', () => pm.expect(json.title).to.be.a('string'));",
+                  "pm.environment.set('testCaseId', json.id);",
+                  "pm.environment.set('testCaseTitle', json.title);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Login flow {{$timestamp}}\",\n  \"description\": \"Verify user can log in successfully\",\n  \"steps\": [\"Enter email\", \"Enter password\", \"Click Login\"],\n  \"expected_result\": \"Redirect to dashboard\",\n  \"status\": \"active\",\n  \"priority\": \"high\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases"]
+            }
+          }
+        },
+        {
+          "name": "List test cases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases"]
+            }
+          }
+        },
+        {
+          "name": "Get one test case",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify testCaseId still points to an existing resource; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const tcId = pm.environment.get('testCaseId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto fixture ' + Date.now() }) }",
+                  "    }, (err, res) => {",
+                  "      if (err) return reject(err);",
+                  "      try { pm.environment.set('testCaseId', res.json().id); } catch (e) {}",
+                  "      resolve();",
+                  "    });",
+                  "  };",
+                  "  if (!tcId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-cases/' + tcId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('ID matches captured', () => pm.expect(json.id).to.eql(parseInt(pm.environment.get('testCaseId'))));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-cases/{{testCaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases", "{{testCaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update test case (partial)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify testCaseId still points to an existing resource; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const tcId = pm.environment.get('testCaseId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto fixture ' + Date.now() }) }",
+                  "    }, (err, res) => {",
+                  "      if (err) return reject(err);",
+                  "      try { pm.environment.set('testCaseId', res.json().id); } catch (e) {}",
+                  "      resolve();",
+                  "    });",
+                  "  };",
+                  "  if (!tcId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-cases/' + tcId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Status updated to deprecated', () => pm.expect(json.status).to.eql('deprecated'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"deprecated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-cases/{{testCaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases", "{{testCaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete test case",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify testCaseId still points to an existing resource; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const tcId = pm.environment.get('testCaseId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto fixture ' + Date.now() }) }",
+                  "    }, (err, res) => {",
+                  "      if (err) return reject(err);",
+                  "      try { pm.environment.set('testCaseId', res.json().id); } catch (e) {}",
+                  "      resolve();",
+                  "    });",
+                  "  };",
+                  "  if (!tcId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-cases/' + tcId,",
+                  "    method: 'GET',",
+                  "    header: { 'Authorization': 'Bearer ' + token }",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-cases/{{testCaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases", "{{testCaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get deleted test case (should 404)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Create + delete a fresh test case so testCaseId points to a deleted resource.",
+                  "// This guarantees GET /test-cases/{{testCaseId}} returns 404 — not affected by",
+                  "// whatever testCaseId was from previous requests.",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "return new Promise((resolve, reject) => {",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-cases',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ title: 'To be deleted ' + Date.now() }) }",
+                  "  }, (err, createRes) => {",
+                  "    if (err) return reject(err);",
+                  "    const createdId = createRes.json().id;",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases/' + createdId,",
+                  "      method: 'DELETE',",
+                  "      header: { 'Authorization': 'Bearer ' + token }",
+                  "    }, (err2, delRes) => {",
+                  "      if (err2) return reject(err2);",
+                  "      pm.environment.set('testCaseId', createdId);",
+                  "      resolve();",
+                  "    });",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-cases/{{testCaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases", "{{testCaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Validation: missing title",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "var json = pm.response.json();",
+                  "pm.test('Mentions title in details', () => pm.expect(JSON.stringify(json.details)).to.include('title'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"missing title\",\n  \"priority\": \"high\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases"]
+            }
+          }
+        },
+        {
+          "name": "Validation: invalid priority enum",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test\",\n  \"priority\": \"urgent\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases"]
+            }
+          }
+        },
+        {
+          "name": "Auth fail: no token on POST /test-cases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Should fail without token\"\n}"
+            },
+            "auth": { "type": "noauth" },
+            "url": {
+              "raw": "{{baseUrl}}/test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-cases"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Suites",
+      "item": [
+        {
+          "name": "Create test suite (needs test cases)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Always create a fresh test case to attach to the suite",
+                  "// (the earlier 'Create test case' was deleted, so its ID is stale)",
+                  "pm.sendRequest({",
+                  "  url: pm.environment.get('baseUrl') + '/test-cases',",
+                  "  method: 'POST',",
+                  "  header: {",
+                  "    'Content-Type': 'application/json',",
+                  "    'Authorization': 'Bearer ' + pm.environment.get('token')",
+                  "  },",
+                  "  body: {",
+                  "    mode: 'raw',",
+                  "    raw: JSON.stringify({ title: 'Suite fixture ' + Date.now() })",
+                  "  }",
+                  "}, (err, res) => {",
+                  "  var json = res.json();",
+                  "  pm.environment.set('testCaseId', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "var json = pm.response.json();",
+                  "pm.test('Has id', () => pm.expect(json.id).to.be.a('number'));",
+                  "pm.test('Has test_case_ids array', () => pm.expect(json.test_case_ids).to.be.an('array'));",
+                  "pm.environment.set('suiteId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Smoke tests {{$timestamp}}\",\n  \"description\": \"Critical flows to verify before each release\",\n  \"test_case_ids\": [{{testCaseId}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-suites",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites"]
+            }
+          }
+        },
+        {
+          "name": "List test suites",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-suites",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites"]
+            }
+          }
+        },
+        {
+          "name": "Get one test suite",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify suiteId still points to an existing suite; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const sId = pm.environment.get('suiteId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto suite fixture ' + Date.now() }) }",
+                  "    }, (err, tcRes) => {",
+                  "      if (err) return reject(err);",
+                  "      const tcId = tcRes.json().id;",
+                  "      pm.environment.set('testCaseId', tcId);",
+                  "      pm.sendRequest({",
+                  "        url: baseUrl + '/test-suites',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json' },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ name: 'Auto suite ' + Date.now(), test_case_ids: [tcId] }) }",
+                  "      }, (err2, sRes) => {",
+                  "        if (err2) return reject(err2);",
+                  "        try { pm.environment.set('suiteId', sRes.json().id); } catch (e) {}",
+                  "        resolve();",
+                  "      });",
+                  "    });",
+                  "  };",
+                  "  if (!sId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-suites/' + sId,",
+                  "    method: 'GET'",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('Has test_case_ids array', () => pm.expect(json.test_case_ids).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-suites/{{suiteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites", "{{suiteId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update test suite (change cases)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify suiteId still points to an existing suite; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const sId = pm.environment.get('suiteId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto suite fixture ' + Date.now() }) }",
+                  "    }, (err, tcRes) => {",
+                  "      if (err) return reject(err);",
+                  "      const tcId = tcRes.json().id;",
+                  "      pm.environment.set('testCaseId', tcId);",
+                  "      pm.sendRequest({",
+                  "        url: baseUrl + '/test-suites',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json' },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ name: 'Auto suite ' + Date.now(), test_case_ids: [tcId] }) }",
+                  "      }, (err2, sRes) => {",
+                  "        if (err2) return reject(err2);",
+                  "        try { pm.environment.set('suiteId', sRes.json().id); } catch (e) {}",
+                  "        resolve();",
+                  "      });",
+                  "    });",
+                  "  };",
+                  "  if (!sId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-suites/' + sId,",
+                  "    method: 'GET'",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "pm.test('test_case_ids now empty', () => pm.expect(json.test_case_ids).to.eql([]));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"test_case_ids\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-suites/{{suiteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites", "{{suiteId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete test suite",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Verify suiteId still points to an existing suite; if not (or empty), create one",
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('token');",
+                  "const sId = pm.environment.get('suiteId');",
+                  "return new Promise((resolve, reject) => {",
+                  "  const create = () => {",
+                  "    pm.sendRequest({",
+                  "      url: baseUrl + '/test-cases',",
+                  "      method: 'POST',",
+                  "      header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "      body: { mode: 'raw', raw: JSON.stringify({ title: 'Auto suite fixture ' + Date.now() }) }",
+                  "    }, (err, tcRes) => {",
+                  "      if (err) return reject(err);",
+                  "      const tcId = tcRes.json().id;",
+                  "      pm.environment.set('testCaseId', tcId);",
+                  "      pm.sendRequest({",
+                  "        url: baseUrl + '/test-suites',",
+                  "        method: 'POST',",
+                  "        header: { 'Content-Type': 'application/json' },",
+                  "        body: { mode: 'raw', raw: JSON.stringify({ name: 'Auto suite ' + Date.now(), test_case_ids: [tcId] }) }",
+                  "      }, (err2, sRes) => {",
+                  "        if (err2) return reject(err2);",
+                  "        try { pm.environment.set('suiteId', sRes.json().id); } catch (e) {}",
+                  "        resolve();",
+                  "      });",
+                  "    });",
+                  "  };",
+                  "  if (!sId) return create();",
+                  "  pm.sendRequest({",
+                  "    url: baseUrl + '/test-suites/' + sId,",
+                  "    method: 'GET'",
+                  "  }, (err, res) => {",
+                  "    if (err) return reject(err);",
+                  "    if (res.code === 200) resolve();",
+                  "    else create();",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test-suites/{{suiteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites", "{{suiteId}}"]
+            }
+          }
+        },
+        {
+          "name": "Validation: missing name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"no name\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/test-suites",
+              "host": ["{{baseUrl}}"],
+              "path": ["test-suites"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Misc",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mentions running', () => pm.expect(pm.response.text()).to.include('running'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            }
+          }
+        },
+        {
+          "name": "Unknown route (should 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error is Route not found', () => pm.expect(pm.response.json().error).to.eql('Route not found'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/this-does-not-exist",
+              "host": ["{{baseUrl}}"],
+              "path": ["this-does-not-exist"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

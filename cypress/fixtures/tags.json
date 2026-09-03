@@ -1,0 +1,8 @@
+[
+  "smoke",
+  "regression",
+  "auth",
+  "rbac",
+  "ui",
+  "api"
+]

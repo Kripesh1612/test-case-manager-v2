@@ -1,0 +1,102 @@
+# Test Case Manager — CI
+#
+# Runs the full Cypress suite (145 tests) on every push to main and on every
+# pull request. Boots a Postgres service container, applies migrations, starts
+# the app, then runs Cypress against it.
+#
+# Cost: ~3–4 min per run on the GitHub-hosted ubuntu-latest runner. Free for
+# public repos; private repos get 2,000 min/month on the free tier.
+#
+# Badges: once this is on main, the README badge
+#   [![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](...)
+# will go green on every green run and red on every failure.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# One job: lint-free, migrate, boot app, run cypress. We don't separate unit
+# tests / API tests / UI tests because the full suite is < 2 minutes — the
+# cost of parallelism isn't worth the complexity.
+jobs:
+  cypress:
+    name: Cypress end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Postgres-as-a-service. Health-checked via pg_isready so the next step
+    # only runs once the DB is accepting connections.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tcm
+          POSTGRES_PASSWORD: tcm
+          POSTGRES_DB: tcm
+          POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tcm -d tcm"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # Same DATABASE_URL shape the app uses locally. The host is
+      # `localhost` because services run in the same network namespace.
+      DATABASE_URL: postgresql://tcm:tcm@localhost:5432/tcm?schema=public
+      JWT_SECRET: ci-secret-do-not-use-in-prod-1234567890
+      ADMIN_EMAILS: cypress-admin@tcm.com
+      PORT: 3001
+      # Keep Cypress from trying to phone home for telemetry / cloud
+      # recording on a CI machine.
+      CYPRESS_CRASH_REPORTS: 0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # `npm ci` is the deterministic equivalent of `npm install` for CI —
+        # it uses package-lock.json exactly. Prisma's postinstall hook runs
+        # `prisma generate` against prisma/schema.prisma, producing the
+        # native client binary for the Ubuntu runner.
+        run: npm ci
+
+      - name: Apply Prisma migrations
+        # `migrate deploy` is the non-interactive sibling of `migrate dev`:
+        # it applies pending migrations and exits. No shadow DB needed, no
+        # prompts — exactly what CI wants.
+        run: npx prisma migrate deploy
+
+      - name: Cypress run
+        # cypress-io/github-action@v6 handles three things that would
+        # otherwise be boilerplate:
+        #   1. caches the Cypress binary between runs (~200 MB saved)
+        #   2. starts `npm start` in the background
+        #   3. waits for the health endpoint, then runs `cypress run`
+        #      with Xvfb if needed for the chosen browser
+        # On failure, screenshots + videos are uploaded as artifacts.
+        uses: cypress-io/github-action@v6
+        with:
+          start: npm start
+          wait-on: 'http://localhost:3001/health'
+          wait-on-timeout: 60
+          browser: electron
+          record: false
+          parallel: false
+        env:
+          DATABASE_URL: postgresql://tcm:tcm@localhost:5432/tcm?schema=public
+          JWT_SECRET: ci-secret-do-not-use-in-prod-1234567890
+          ADMIN_EMAILS: cypress-admin@tcm.com

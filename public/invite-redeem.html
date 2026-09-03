@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accept Invite — Test Case Manager</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="brand">Test Case Manager</h1>
+  </header>
+  <main class="content">
+    <div class="auth-card" data-cy="invite-redeem-card">
+      <h2>Accept your invite</h2>
+      <p class="page-subtitle" id="invite-email-hint">You've been invited to join.</p>
+      <form id="invite-redeem-form" data-cy="invite-redeem-form">
+        <label for="name">Your name</label>
+        <input id="name" name="name" type="text" required data-cy="invite-name-input" autocomplete="name">
+
+        <label for="password">Choose a password</label>
+        <input id="password" name="password" type="password" required minlength="6" data-cy="invite-password-input" autocomplete="new-password">
+
+        <button type="submit" class="btn primary" data-cy="invite-redeem-submit">Accept invite</button>
+      </form>
+      <p class="auth-error" id="invite-error" data-cy="invite-error" hidden></p>
+      <p class="auth-alt">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
+  </main>
+  <script src="/shared.js"></script>
+  <script src="/invite-redeem.js"></script>
+</body>
+</html>

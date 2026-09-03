@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "email": "cypress-admin@tcm.com",
+    "password": "password123",
+    "name": "Cypress Admin",
+    "role": "admin"
+  },
+  "editor": {
+    "email": "editor@example.com",
+    "password": "password123",
+    "name": "Sample Editor",
+    "role": "editor"
+  },
+  "viewer": {
+    "email": "viewer@example.com",
+    "password": "password123",
+    "name": "Sample Viewer",
+    "role": "viewer"
+  }
+}

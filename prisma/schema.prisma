@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  // `native` covers dev on the host machine; the Alpine target covers the
+  // production container (node:22-alpine ships with musl + openssl 3.0.x).
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TestCase {
+  id                Int      @id @default(autoincrement())
+  title             String
+  description       String   @default("")
+  steps             Json      @default("[]") @db.JsonB
+  expected_result   String   @default("")
+  status            String   @default("draft")
+  priority          String   @default("medium")
+  result            String   @default("not_run") // not_run | passed | failed
+  tags              Json      @default("[]") @db.JsonB
+  executable_snippet String? // optional Cypress test body that /execute runs; null = doc-only case
+  last_run_at       DateTime?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  deleted_at        DateTime? // soft-delete tombstone; NULL = live
+
+  suites TestSuiteCase[]
+  runs   TestRun[]
+  versions TestCaseVersion[]
+
+  @@map("test_cases")
+}
+
+// Immutable snapshot of a TestCase's user-editable fields. Append-only:
+// every save (create or update) writes a new row here so the full edit
+// history is preserved. The "current" row is still TestCase; this table
+// only stores history.
+//
+// snapshot is a JSON blob with the versioned fields: title, description,
+// steps, expected_result, priority, status, tags. Anything else (created_at,
+// updated_at, deleted_at, run history) is metadata and is NOT snapshotted.
+//
+// On restore, we copy snapshot.* back onto the live TestCase row and write
+// a fresh version capturing the post-restore state — so the restore itself
+// is also in history.
+model TestCaseVersion {
+  id            Int      @id @default(autoincrement())
+  case_id       Int
+  case          TestCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+  version       Int      // monotonic per case_id, starts at 1
+  snapshot      Json     // { title, description, steps, expected_result, priority, status, tags }
+  created_at    DateTime @default(now())
+  created_by_id Int?     // null when the initial snapshot is created server-side at case creation
+
+  @@unique([case_id, version])
+  @@index([case_id, version])
+  @@map("test_case_versions")
+}
+
+model TestSuite {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  deleted_at  DateTime? // soft-delete tombstone; NULL = live
+
+  cases TestSuiteCase[]
+  scheduled_jobs ScheduledJob[]
+
+  @@map("test_suites")
+}
+
+// Many-to-many join table between TestCase and TestSuite
+model TestSuiteCase {
+  test_case_id  Int
+  test_suite_id Int
+
+  test_case  TestCase  @relation(fields: [test_case_id], references: [id], onDelete: Cascade)
+  test_suite TestSuite @relation(fields: [test_suite_id], references: [id], onDelete: Cascade)
+
+  @@id([test_case_id, test_suite_id])
+  @@map("test_suite_cases")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  password_hash String
+  name          String   @default("")
+  role          String   @default("editor") // admin | editor | viewer
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  invites         Invite[]     @relation("CreatedInvites")
+  runs            TestRun[]    @relation("RunsPerformed")
+  audit_actor     AuditEvent[] @relation("AuditActor")
+  scheduled_jobs  ScheduledJob[] @relation("CreatedScheduledJobs")
+
+  @@map("users")
+}
+
+// Invite — gated-registration mechanism. See docs/invites.md.
+//
+// Workflow:
+//   1. Admin POSTs /invites with { email, role } -> gets a { token, accept_url }.
+//   2. The accept_url is opened in a browser; /invite-redeem.html collects
+//      name + password and POSTs { token, name, password } to /invites/redeem.
+//   3. redeem() validates the token, creates the user, and stamps accepted_at.
+model Invite {
+  id            Int       @id @default(autoincrement())
+  email         String
+  role          String    @default("editor") // admin | editor | viewer
+  token         String    @unique            // 32-byte random hex
+  expires_at    DateTime
+  accepted_at   DateTime?
+  created_by_id Int
+  created_by    User      @relation("CreatedInvites", fields: [created_by_id], references: [id])
+  created_at    DateTime  @default(now())
+
+  @@index([email])
+  @@map("invites")
+}
+
+// TestRun — every execution of a test case. Replaces the single
+// TestCase.result field with a time-series of runs.
+//
+// The "current" result is the most-recently-finished run's status
+// (or "not_run" if none). See utils/serialize.js#withDerivedResult.
+model TestRun {
+  id             Int       @id @default(autoincrement())
+  test_case_id   Int
+  test_case      TestCase  @relation(fields: [test_case_id], references: [id])
+  status         String    @default("not_run") // not_run | running | passed | failed | errored
+  started_at     DateTime  @default(now())
+  finished_at    DateTime?
+  duration_ms    Int?
+  notes          String?
+  run_by_id      Int?
+  run_by         User?     @relation("RunsPerformed", fields: [run_by_id], references: [id])
+  // Phase 8 — real test execution telemetry. All four columns are
+  // nullable on existing rows; the migration adds them without defaults
+  // so older runs continue to render the same way.
+  error_log      String?   // last 4 KB of Cypress stdout/stderr when status='errored'
+  assertion_count Int?     // total assertions in the spec the runner executed
+  exit_code      Int?      // Cypress process exit code (0 = clean)
+  started_via    String?   @default("manual") // 'manual' | 'scheduled' | 'api' — origin of the run
+
+  @@index([test_case_id])
+  @@index([started_at])
+  @@map("test_runs")
+}
+
+// AuditEvent — every meaningful mutation is recorded here. See
+// middleware/withAudit.js for how this is populated.
+model AuditEvent {
+  id          Int      @id @default(autoincrement())
+  actor_id    Int?
+  actor       User?    @relation("AuditActor", fields: [actor_id], references: [id])
+  action      String                          // "case.create" | "case.update" | "case.delete" | ...
+  target_type String                          // "test_case" | "test_suite" | "user" | "invite" | "run"
+  target_id   Int?
+  ip          String?
+  user_agent  String?
+  metadata    Json?     @db.JsonB              // { fields, before, after, ... }
+  created_at  DateTime @default(now())
+
+  @@index([actor_id])
+  @@index([target_type, target_id])
+  @@index([created_at])
+  @@map("audit_events")
+}
+
+// ScheduledJob — cron-based trigger that fires a test suite on a schedule.
+//
+// Lifecycle of one fire:
+//   1. schedulerLoop wakes every minute, scans for enabled jobs where
+//      next_run_at <= now OR retry_at <= now.
+//   2. The job is atomically claimed (next_run_at cleared, new next_run_at
+//      computed from the cron expression) BEFORE the suite is executed —
+//      so a slow suite that runs past the next tick won't be double-fired.
+//   3. The suite is executed: one TestRun row per member case.
+//   4. On success: last_run_at = now, retry_count = 0.
+//   5. On error: retry_count += 1; if <= max_retries, retry_at = now +
+//      2^retry_count minutes (with small jitter). Otherwise the job is
+//      effectively paused until an admin re-enables it.
+model ScheduledJob {
+  id            Int       @id @default(autoincrement())
+  name          String
+  cron          String    // standard 5-field cron: "minute hour dom month dow"
+  timezone      String    @default("UTC")
+  suite_id      Int
+  suite         TestSuite @relation(fields: [suite_id], references: [id], onDelete: Cascade)
+  enabled       Boolean   @default(true)
+  last_run_at   DateTime?
+  next_run_at   DateTime? // computed on create/update and after each fire
+  retry_count   Int       @default(0)
+  max_retries   Int       @default(0)
+  retry_at      DateTime? // when set, overrides next_run_at for the next fire
+  last_error    String?   // captured exception text from the last failed fire
+  created_by_id Int
+  created_by    User      @relation("CreatedScheduledJobs", fields: [created_by_id], references: [id])
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  @@index([enabled, next_run_at])
+  @@index([enabled, retry_at])
+  @@map("scheduled_jobs")
+}

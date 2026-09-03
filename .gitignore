@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+.env
+
+# npm accidentally-created artifacts (e.g. when started in wrong dir)
+/node
+/*@*.0.0
+.env
+
+# Cypress transient download artifacts
+/cypress/downloads/
