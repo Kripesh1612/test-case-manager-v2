@@ -43,11 +43,14 @@ COPY --from=deps /app/prisma ./prisma
 COPY index.js ./
 COPY config.js ./
 COPY db.js ./
-COPY validation.js ./
 COPY routes ./routes
 COPY middleware ./middleware
 COPY utils ./utils
+COPY shared ./shared
 COPY public ./public
+# React client build (built locally with `npm run build -w client` before
+# `docker compose build app` so the image can serve the SPA from /assets).
+COPY client/dist ./client/dist
 
 # Entrypoint waits for Postgres, applies migrations, then starts the server.
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

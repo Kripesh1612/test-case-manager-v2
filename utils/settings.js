@@ -59,11 +59,13 @@ const getTrashRetentionDays = () => {
 // --- Rate limit caps (requests per 60s window per IP) ---
 //
 // Defaults are deliberately generous so the Cypress suite isn't tripped
-// during a fast CI run. For production deployments, tighten via env:
+// during a fast CI run (the API suite alone does ~17 fresh registrations
+// in a row, and UI specs add more on top). For production deployments,
+// tighten via env:
 //   RATE_LIMIT_LOGIN_MAX=10      RATE_LIMIT_REGISTER_MAX=3
 
-const DEFAULT_RATE_LIMIT_LOGIN_MAX = 30;
-const DEFAULT_RATE_LIMIT_REGISTER_MAX = 30;
+const DEFAULT_RATE_LIMIT_LOGIN_MAX = 200;
+const DEFAULT_RATE_LIMIT_REGISTER_MAX = 200;
 
 const getRateLimitLoginMax = () => {
   const n = parseInt(process.env.RATE_LIMIT_LOGIN_MAX, 10);

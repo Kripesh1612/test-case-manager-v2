@@ -115,11 +115,13 @@ describe('API: /execution', () => {
 
   it('SSE stream returns snapshot for an existing run (and 404 for a missing run)', () => {
     // Seed a run, then GET /runs/:id/stream, close immediately, and
-    // verify the snapshot event was emitted. We can't easily wait for
-    // the SSE response body to fully flush inside a Cypress test (the
-    // cy.request helper doesn't natively understand SSE), so we rely
-    // on the route's 200 vs 404 contract — the snapshot itself is
-    // exercised by the UI test.
+    // verify the snapshot event was emitted. We can't use cy.request
+    // here — it waits for the full response body, and SSE streams
+    // never close, so the call would always time out. Instead we use
+    // fetch with an AbortController: open the stream, read the first
+    // event, then abort. The UI test in 12-execution.cy.js exercises
+    // the full snapshot round-trip.
+    let runId;
     cy.createTestCase(adminToken, {
       title: `exec-sse-${Date.now()}`,
       executable_snippet: "it('x', () => {});",
@@ -130,22 +132,39 @@ describe('API: /execution', () => {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
     }).then((runResp) => {
-      const runId = runResp.body.id;
-      return cy.request({
-        method: 'GET',
-        url: `/runs/${runId}/stream`,
-        headers: { Authorization: `Bearer ${adminToken}` },
-        // Don't reject on non-2xx. We only want to confirm the route
-        // accepts the request — the actual stream body is read by the
-        // UI test.
-        failOnStatusCode: false,
-        timeout: 5000,
-      }).then((streamResp) => {
-        // 200 means the server opened the stream. Anything else (other
-        // than 200 from a path-test) would be a regression. The stream
-        // body is consumed via fetch in the UI test.
-        expect([200, 304], 'stream route reachable').to.include(streamResp.status);
+      runId = runResp.body.id;
+      // Read the first SSE event then abort. fetch resolves as soon as
+      // response headers arrive, so we wait one short tick for the
+      // first chunk of the body, then tear the connection down.
+      return new Cypress.Promise((resolve, reject) => {
+        const ac = new AbortController();
+        fetch(`/runs/${runId}/stream`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+          signal: ac.signal,
+        }).then((res) => {
+          const status = res.status;
+          // Read one chunk of the body, then abort so the connection
+          // doesn't stay open (which would hang the test runner).
+          const reader = res.body.getReader();
+          reader.read().then(() => {
+            ac.abort();
+            resolve(status);
+          }).catch(() => {
+            ac.abort();
+            resolve(status);
+          });
+        }).catch((err) => {
+          // AbortError on intentional teardown is expected; only
+          // surface genuine failures.
+          if (err.name !== 'AbortError') reject(err);
+          else resolve(0);
+        });
       });
+    }).then((streamStatus) => {
+      // 200 means the server opened the stream. Anything else (other
+      // than 200 from a path-test) would be a regression. The stream
+      // body is consumed via fetch in the UI test.
+      expect(streamStatus, 'stream route reachable').to.eq(200);
     });
 
     // 404 path — separate case so the failure is unambiguous.
