@@ -1,8 +1,10 @@
-# Test Case Manager
+# Regress
 
+> **Catch what changed before your users do.**
+>
 > A self-contained test management platform: REST API, React UI, real Cypress
 > execution, flakiness scoring, version history, scheduler, RBAC, audit log,
-> and a 211-test end-to-end suite that documents itself.
+> and a 205-test end-to-end suite that documents itself.
 
 [![CI](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -35,8 +37,10 @@
 ## Why this project exists
 
 Most "test case manager" tutorials stop at a CRUD form. This one keeps going.
-The goal is to ship a small, complete product — every layer of a modern
-QA workflow — that still reads as a learning resource:
+Regress ships the full QA workflow — cases, suites, runs, version history,
+flakiness, scheduler, real Cypress execution, RBAC, audit log — wrapped in
+a refined product UI ("Catch what changed before your users do."). It's
+both a usable tool and a learning resource:
 
 - The **same domain** (test cases, suites, runs) is exposed at three levels
   (curl, Postman, Cypress) so newcomers can pick the layer that matches their
@@ -80,9 +84,10 @@ doc is the 5-minute tour.
 
 ### Quality
 
-- **211 Cypress tests** (125 API + 80 UI + 6 advanced patterns) — all green in CI.
+- **205 Cypress tests** (125 API + 80 UI) — all green in CI.
 - **Zod schemas shared** between client and server (single source of truth for input validation).
 - **Strict TypeScript** on the client (no `any` in the feature code).
+- **Branded design system** — Tailwind v4 `@theme` tokens, Regress violet/warm-neutral palette, reusable `Card` / `Button` / `Pill` / `PageHeader` / `EmptyState` / `Icon` primitives. Every `data-cy` hook from the previous UI is preserved so the e2e suite runs unchanged.
 - **Docker multi-stage build** with health checks and `wait-for-postgres`.
 - **CI on every push** to `main` and every PR (~3–4 min, free for public repos).
 
@@ -96,7 +101,7 @@ doc is the 5-minute tour.
 | Database | PostgreSQL 16 via Prisma 5 |
 | Auth | JWT (`jsonwebtoken`) + bcrypt |
 | Validation | Zod (shared ESM schemas) |
-| Frontend | React 19 + Vite 8 + TypeScript 5 + Tailwind 3 |
+| Frontend | React 19 + Vite 8 + TypeScript 5 + Tailwind 4 (CSS-first `@theme`) |
 | Client data | TanStack Query v5 + React Hook Form + Zod resolver |
 | Tests | Cypress 13 (Electron headless + E2E) |
 | Container | Docker multi-stage, `docker compose` for local stack |

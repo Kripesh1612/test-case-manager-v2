@@ -1,7 +1,7 @@
 {
-  "name": "test-case-manager",
+  "name": "regress",
   "version": "1.0.0",
-  "description": "REST API for managing test cases",
+  "description": "Regress — catch what changed before your users do. Test case management with version history, flakiness scoring, scheduler, and real Cypress execution.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

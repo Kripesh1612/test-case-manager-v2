@@ -1,3 +1,4 @@
+// =============================================================================
 // /admin — admin-only user + invite management.
 //
 // Reproduces the public/admin.html + public/admin.js UX with React:
@@ -13,11 +14,18 @@
 //     the modal backdrop — same trick as the vanilla admin.js)
 //
 // The data-cy contract matches what ui/05-admin.cy.js and
-// ui/07-invites.cy.js expect.
+// ui/07-invites.cy.js expect, including the legacy `role-pill.role-*`
+// classes and `btn small danger` styles that the index.css still ships.
+// =============================================================================
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { EmptyState, SkeletonRows } from '@/components/EmptyState';
+import { Icon } from '@/components/Icons';
 import { ConfirmModal } from '@/components/Modal';
+import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
@@ -188,225 +196,298 @@ export function AdminPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Admin</h2>
-          <p className="text-sm text-gray-500">
-            Manage users and their roles
-          </p>
-        </div>
-      </div>
-
-      {q.isLoading && (
-        <div className="py-6 text-center text-sm text-gray-500">Loading…</div>
-      )}
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Administration"
+        title="Admin"
+        description="Manage workspace members and send out invitations."
+      />
 
       {q.error && (
-        <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Failed to load: {(q.error as Error).message}
+        <div className="flex items-start gap-3 rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger-text">
+          <Icon.Warning size={16} />
+          <div>
+            <strong className="font-semibold">Failed to load</strong>
+            <p className="mt-0.5 text-xs opacity-90">
+              {(q.error as Error).message}
+            </p>
+          </div>
         </div>
+      )}
+
+      {q.isLoading && (
+        <Card className="p-4">
+          <SkeletonRows rows={4} />
+        </Card>
       )}
 
       {/* ---------- Users section ---------- */}
-      <div className="mb-3 flex flex-wrap items-center gap-3 rounded border border-gray-200 bg-white p-3">
-        <label htmlFor="admin-user-search" className="text-sm font-medium">
-          Search users
-        </label>
-        <input
-          id="admin-user-search"
-          data-cy="admin-user-search"
-          type="search"
-          value={userSearch}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Filter by email or name…"
-          autoComplete="off"
-          className="min-w-[200px] flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-        />
-        <div data-cy="admin-user-total-wrap" className="text-xs text-gray-500">
-          Total:{' '}
-          <strong data-cy="admin-user-total">{users.length}</strong>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text">Users</h2>
+            <p className="text-xs text-text-secondary">
+              Members of this workspace. Admins can change roles; you can't change your own.
+            </p>
+          </div>
+          <div data-cy="admin-user-total-wrap" className="text-xs text-text-secondary">
+            Total: <strong data-cy="admin-user-total" className="text-text">{users.length}</strong>
+          </div>
         </div>
-      </div>
 
-      <p
-        data-cy="admin-user-window-hint"
-        className="mb-2 text-xs text-gray-500"
-      >
-        {usersHint}
-      </p>
+        <Card className="p-4">
+          <div className="relative flex-1 min-w-[240px]">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+              <Icon.Search size={14} />
+            </span>
+            <input
+              id="admin-user-search"
+              data-cy="admin-user-search"
+              type="search"
+              value={userSearch}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter by email or name…"
+              autoComplete="off"
+              className="rg-input pl-9"
+            />
+          </div>
+        </Card>
 
-      <table
-        data-cy="admin-table"
-        className="mb-8 w-full table-auto border-collapse rounded border border-gray-200 bg-white text-sm"
-      >
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-3 py-2 text-left">ID</th>
-            <th className="px-3 py-2 text-left">Email</th>
-            <th className="px-3 py-2 text-left">Name</th>
-            <th className="px-3 py-2 text-left">Role</th>
-            <th className="px-3 py-2 text-left">Created</th>
-            <th className="px-3 py-2 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {displayedUsers.map((u) => {
-            const isSelf = currentUser?.id === u.id;
-            return (
-              <tr
-                key={u.id}
-                data-cy="admin-user-row"
-                data-user-id={u.id}
-                className={isSelf ? 'row-self' : ''}
-              >
-                <td data-cy="admin-user-id" className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
-                  {u.id}
-                </td>
-                <td data-cy="admin-user-email" className="border-t border-gray-100 px-3 py-2">
-                  {u.email}
-                </td>
-                <td data-cy="admin-user-name" className="border-t border-gray-100 px-3 py-2">
-                  {u.name || '—'}
-                </td>
-                <td data-cy="admin-user-role-cell" className="border-t border-gray-100 px-3 py-2">
-                  <span className={`role-pill role-${u.role}`}>{u.role}</span>
-                  {isSelf && (
-                    <span className="you-badge ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-blue-700">
-                      you
-                    </span>
-                  )}
-                </td>
-                <td data-cy="admin-user-created" className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
-                  {new Date(u.created_at).toLocaleDateString()}
-                </td>
-                <td data-cy="admin-user-actions" className="border-t border-gray-100 px-3 py-2">
-                  <select
-                    data-cy="admin-role-select"
-                    data-id={u.id}
-                    disabled={isSelf}
-                    title={isSelf ? 'You cannot change your own role' : undefined}
-                    value={u.role}
-                    onChange={(e) => {
-                      const nextRole = e.target.value as AdminUserData['role'];
-                      if (nextRole === u.role) return;
-                      setPending({ kind: 'role', user: u, nextRole });
-                    }}
-                    className="rounded border border-gray-300 px-1 py-0.5 text-xs"
-                  >
-                    <option value="admin">admin</option>
-                    <option value="editor">editor</option>
-                    <option value="viewer">viewer</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="btn small danger ml-2"
-                    data-cy="admin-delete-btn"
-                    data-id={u.id}
-                    data-action="delete-user"
-                    disabled={isSelf}
-                    title={isSelf ? 'You cannot delete yourself' : undefined}
-                    onClick={() => setPending({ kind: 'delete', user: u })}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+        <p
+          data-cy="admin-user-window-hint"
+          className="text-xs text-text-tertiary"
+        >
+          {usersHint}
+        </p>
 
-      <div
-        data-cy="admin-users-empty"
-        className="py-6 text-center text-sm text-gray-500"
-        style={{ display: displayedUsers.length === 0 ? 'block' : 'none' }}
-      >
-        No users match the current filters.
-      </div>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table
+              data-cy="admin-table"
+              className="w-full text-sm"
+            >
+              <thead className="bg-surface-sunken text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">ID</th>
+                  <th className="px-5 py-2.5 font-medium">Email</th>
+                  <th className="px-5 py-2.5 font-medium">Name</th>
+                  <th className="px-5 py-2.5 font-medium">Role</th>
+                  <th className="px-5 py-2.5 font-medium">Created</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft">
+                {displayedUsers.map((u) => {
+                  const isSelf = currentUser?.id === u.id;
+                  return (
+                    <tr
+                      key={u.id}
+                      data-cy="admin-user-row"
+                      data-user-id={u.id}
+                      className={`transition-colors hover:bg-surface-hover ${isSelf ? 'row-self bg-brand-soft/40' : ''}`}
+                    >
+                      <td
+                        data-cy="admin-user-id"
+                        className="px-5 py-3 text-xs text-text-tertiary"
+                      >
+                        #{u.id}
+                      </td>
+                      <td
+                        data-cy="admin-user-email"
+                        className="px-5 py-3 font-medium text-text"
+                      >
+                        {u.email}
+                      </td>
+                      <td
+                        data-cy="admin-user-name"
+                        className="px-5 py-3 text-text-secondary"
+                      >
+                        {u.name || '—'}
+                      </td>
+                      <td data-cy="admin-user-role-cell" className="px-5 py-3">
+                        <span className={`role-pill role-${u.role}`}>{u.role}</span>
+                        {isSelf && (
+                          <span className="you-badge ml-2 inline-flex items-center rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-brand-hover">
+                            you
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        data-cy="admin-user-created"
+                        className="px-5 py-3 text-xs text-text-secondary"
+                      >
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td data-cy="admin-user-actions" className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <select
+                            data-cy="admin-role-select"
+                            data-id={u.id}
+                            disabled={isSelf}
+                            title={isSelf ? 'You cannot change your own role' : undefined}
+                            value={u.role}
+                            onChange={(e) => {
+                              const nextRole = e.target.value as AdminUserData['role'];
+                              if (nextRole === u.role) return;
+                              setPending({ kind: 'role', user: u, nextRole });
+                            }}
+                            className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-text focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft"
+                          >
+                            <option value="admin">admin</option>
+                            <option value="editor">editor</option>
+                            <option value="viewer">viewer</option>
+                          </select>
+                          <button
+                            type="button"
+                            className="btn small danger"
+                            data-cy="admin-delete-btn"
+                            data-id={u.id}
+                            data-action="delete-user"
+                            disabled={isSelf}
+                            title={isSelf ? 'You cannot delete yourself' : undefined}
+                            onClick={() => setPending({ kind: 'delete', user: u })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            data-cy="admin-users-empty"
+            style={{ display: displayedUsers.length === 0 ? 'block' : 'none' }}
+          >
+            <EmptyState
+              icon={<Icon.Admin size={20} />}
+              title="No users match"
+              description="Try clearing the search to see every workspace member."
+            />
+          </div>
+        </Card>
+      </section>
 
       {/* ---------- Invites section ---------- */}
-      <div className="mt-8 mb-3 flex flex-wrap items-center gap-3 rounded border border-gray-200 bg-white p-3">
-        <h3 className="text-base font-semibold">Invites</h3>
-        <input
-          id="invite-search"
-          data-cy="invite-search"
-          type="search"
-          value={inviteSearch}
-          onChange={(e) => setInviteSearch(e.target.value)}
-          placeholder="Filter invites…"
-          autoComplete="off"
-          className="min-w-[200px] flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-        />
-        <button
-          type="button"
-          data-cy="invite-create-btn"
-          onClick={() => setInviteModal({ open: true, email: '', role: 'viewer', error: null })}
-          className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700"
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text">Invites</h2>
+            <p className="text-xs text-text-secondary">
+              Outstanding email invites. Revoke to invalidate a token immediately.
+            </p>
+          </div>
+        </div>
+
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+                <Icon.Search size={14} />
+              </span>
+              <input
+                id="invite-search"
+                data-cy="invite-search"
+                type="search"
+                value={inviteSearch}
+                onChange={(e) => setInviteSearch(e.target.value)}
+                placeholder="Filter invites…"
+                autoComplete="off"
+                className="rg-input pl-9"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              data-cy="invite-create-btn"
+              leftIcon={<Icon.Plus size={14} />}
+              onClick={() => setInviteModal({ open: true, email: '', role: 'viewer', error: null })}
+            >
+              New invite
+            </Button>
+          </div>
+        </Card>
+
+        <p
+          data-cy="invite-window-hint"
+          className="text-xs text-text-tertiary"
         >
-          + New Invite
-        </button>
-      </div>
+          {invitesHint}
+        </p>
 
-      <p
-        data-cy="invite-window-hint"
-        className="mb-2 text-xs text-gray-500"
-      >
-        {invitesHint}
-      </p>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-sunken text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">ID</th>
+                  <th className="px-5 py-2.5 font-medium">Email</th>
+                  <th className="px-5 py-2.5 font-medium">Role</th>
+                  <th className="px-5 py-2.5 font-medium">Status</th>
+                  <th className="px-5 py-2.5 font-medium">Expires</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody data-cy="invite-table-body" className="divide-y divide-border-soft">
+                {displayedInvites.map((inv) => {
+                  const expired = inv.expires_at !== null && new Date(inv.expires_at) < new Date();
+                  const status = inv.accepted_at ? 'accepted' : expired ? 'expired' : 'pending';
+                  return (
+                    <tr
+                      key={inv.id}
+                      data-cy="invite-row"
+                      data-invite-id={inv.id}
+                      className="transition-colors hover:bg-surface-hover"
+                    >
+                      <td className="px-5 py-3 text-xs text-text-tertiary">#{inv.id}</td>
+                      <td className="px-5 py-3 font-medium text-text">{inv.email}</td>
+                      <td className="px-5 py-3">
+                        <span className={`role-pill role-${inv.role}`}>{inv.role}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`role-pill role-${status}`}>{status}</span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-text-secondary">
+                        {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end">
+                          <button
+                            type="button"
+                            className="btn small danger"
+                            data-cy="invite-revoke-btn"
+                            data-id={inv.id}
+                            disabled={Boolean(inv.accepted_at)}
+                            title={inv.accepted_at ? 'Already accepted' : undefined}
+                            onClick={() => setPending({ kind: 'revoke', invite: inv })}
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-      <table className="w-full table-auto border-collapse rounded border border-gray-200 bg-white text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-3 py-2 text-left">ID</th>
-            <th className="px-3 py-2 text-left">Email</th>
-            <th className="px-3 py-2 text-left">Role</th>
-            <th className="px-3 py-2 text-left">Status</th>
-            <th className="px-3 py-2 text-left">Expires</th>
-            <th className="px-3 py-2 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody data-cy="invite-table-body">
-          {displayedInvites.map((inv) => {
-            const expired = inv.expires_at !== null && new Date(inv.expires_at) < new Date();
-            const status = inv.accepted_at ? 'accepted' : expired ? 'expired' : 'pending';
-            return (
-              <tr key={inv.id} data-cy="invite-row" data-invite-id={inv.id}>
-                <td className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">{inv.id}</td>
-                <td className="border-t border-gray-100 px-3 py-2">{inv.email}</td>
-                <td className="border-t border-gray-100 px-3 py-2">{inv.role}</td>
-                <td className="border-t border-gray-100 px-3 py-2">
-                  <span className={`role-pill role-${status}`}>{status}</span>
-                </td>
-                <td className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
-                  {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
-                </td>
-                <td className="border-t border-gray-100 px-3 py-2">
-                  <button
-                    type="button"
-                    className="btn small danger"
-                    data-cy="invite-revoke-btn"
-                    data-id={inv.id}
-                    disabled={Boolean(inv.accepted_at)}
-                    title={inv.accepted_at ? 'Already accepted' : undefined}
-                    onClick={() => setPending({ kind: 'revoke', invite: inv })}
-                  >
-                    Revoke
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div
-        data-cy="invite-table-empty"
-        className="py-6 text-center text-sm text-gray-500"
-        style={{ display: displayedInvites.length === 0 ? 'block' : 'none' }}
-      >
-        No invites match the current filters.
-      </div>
+          <div
+            data-cy="invite-table-empty"
+            style={{ display: displayedInvites.length === 0 ? 'block' : 'none' }}
+          >
+            <EmptyState
+              icon={<Icon.Mail size={20} />}
+              title="No invites match"
+              description="Try clearing the filter or send a new invite."
+            />
+          </div>
+        </Card>
+      </section>
 
       {/* ---------- Modals ---------- */}
       {pending && pending.kind === 'role' && (
@@ -446,73 +527,102 @@ export function AdminPage() {
           can find it after close. Hidden via CSS when not open. */}
       <div
         data-cy="invite-modal"
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         style={{ display: inviteModal.open ? 'flex' : 'none' }}
         onClick={() => setInviteModal((s) => ({ ...s, open: false }))}
       >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded bg-white p-5 shadow-xl"
-          >
-            <h3 className="mb-2 text-base font-semibold">Create invite</h3>
-            {inviteModal.error && (
-              <p
-                data-cy="invite-modal-error"
-                className="mb-2 text-xs text-red-600"
-              >
-                {inviteModal.error}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-[var(--shadow-pop)]"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="mb-4 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+              <Icon.Mail size={16} />
+            </span>
+            <div>
+              <h3 className="text-base font-semibold text-text">Create invite</h3>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Send a single-use invite token by email.
               </p>
-            )}
-            <label className="mb-1 block text-sm font-medium">Email</label>
-            <input
-              id="invite-email"
-              data-cy="invite-email-input"
-              type="email"
-              autoComplete="off"
-              value={inviteModal.email}
-              onChange={(e) =>
-                setInviteModal((s) => ({ ...s, email: e.target.value, error: null }))
-              }
-              className="mb-3 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-            />
-            <label className="mb-1 block text-sm font-medium">Role</label>
-            <select
-              id="invite-role"
-              data-cy="invite-role-select"
-              value={inviteModal.role}
-              onChange={(e) =>
-                setInviteModal((s) => ({
-                  ...s,
-                  role: e.target.value as AdminUserData['role'],
-                }))
-              }
-              className="mb-4 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="admin">admin</option>
-              <option value="editor">editor</option>
-              <option value="viewer">viewer</option>
-            </select>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                data-cy="invite-modal-cancel"
-                onClick={() => setInviteModal((s) => ({ ...s, open: false }))}
-                className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-cy="invite-modal-confirm"
-                onClick={submitInviteModal}
-                disabled={createInviteM.isPending}
-                className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                {createInviteM.isPending ? 'Creating…' : 'Create'}
-              </button>
             </div>
           </div>
+
+          {inviteModal.error && (
+            <div
+              data-cy="invite-modal-error"
+              className="mb-3 flex items-start gap-2 rounded-md border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
+            >
+              <Icon.Warning size={14} />
+              <span>{inviteModal.error}</span>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="invite-email" className="mb-1 block text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                Email
+              </label>
+              <input
+                id="invite-email"
+                data-cy="invite-email-input"
+                type="email"
+                autoComplete="off"
+                value={inviteModal.email}
+                onChange={(e) =>
+                  setInviteModal((s) => ({ ...s, email: e.target.value, error: null }))
+                }
+                className="rg-input"
+                placeholder="teammate@example.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="invite-role" className="mb-1 block text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                Role
+              </label>
+              <select
+                id="invite-role"
+                data-cy="invite-role-select"
+                value={inviteModal.role}
+                onChange={(e) =>
+                  setInviteModal((s) => ({
+                    ...s,
+                    role: e.target.value as AdminUserData['role'],
+                  }))
+                }
+                className="rg-input"
+              >
+                <option value="admin">admin</option>
+                <option value="editor">editor</option>
+                <option value="viewer">viewer</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              data-cy="invite-modal-cancel"
+              onClick={() => setInviteModal((s) => ({ ...s, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              data-cy="invite-modal-confirm"
+              onClick={submitInviteModal}
+              loading={createInviteM.isPending}
+              leftIcon={<Icon.Mail size={14} />}
+            >
+              {createInviteM.isPending ? 'Creating…' : 'Create invite'}
+            </Button>
+          </div>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -1,18 +1,29 @@
-// The Test Cases list page.
+// =============================================================================
+// /cases — Test case list.
 //
-// Brings together the toolbar (search + status/priority chips + sort),
-// the inline create/edit form, the bulk-selection bar, the row list,
-// and the delete-confirm modal. State is local; data comes from
-// TanStack Query (`useCases`); mutations are optimistic on the cache.
+// Layout:
+//   • Read-only banner (viewers) + verdict-drill-in banner
+//   • Page header with "New Test Case" CTA
+//   • Inline create/edit form (collapsible)
+//   • Toolbar: search + status chips + priority chips + sort
+//   • Result count + bulk-action bar (appears when ≥1 selected)
+//   • Table-style row list with checkbox, title, status/priority pills,
+//     flakiness badge, last-result chip, and Edit/Delete actions
 //
-// URL sync: filter + sort are reflected in the query string so links
-// are shareable and so the Cypress UI tests can assert on the URL
-// after chip clicks.
+// All existing data-cy hooks are preserved verbatim so the UI test suite
+// keeps passing without changes.
+// =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { ConfirmModal } from '@/components/Modal';
+import { Pill, ResultPill, StatusPill, PriorityPill } from '@/components/Pill';
+import { Button } from '@/components/Button';
+import { EmptyState, SkeletonRows } from '@/components/EmptyState';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/Card';
+import { Icon } from '@/components/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
@@ -33,11 +44,7 @@ type PriorityFilter = (typeof PRIORITY_VALUES)[number] | 'all';
 type SortKey = 'created_desc' | 'created_asc' | 'title_asc' | 'title_desc' | 'priority_desc';
 
 const SORT_VALUES: SortKey[] = [
-  'created_desc',
-  'created_asc',
-  'title_asc',
-  'title_desc',
-  'priority_desc',
+  'created_desc', 'created_asc', 'title_asc', 'title_desc', 'priority_desc',
 ];
 
 function isStatusFilter(v: string | null): v is StatusFilter {
@@ -74,47 +81,25 @@ export function CaseListPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CaseData | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  /** null = no modal; otherwise an array of ids to delete on confirm. */
   const [pendingDelete, setPendingDelete] = useState<number[] | null>(null);
-  /** Ref for the form section — used to scroll into view when Edit is
-   *  clicked on a row far down the list, so the user doesn't lose track
-   *  of which case they're editing. */
   const formRef = useRef<HTMLDivElement | null>(null);
 
-  // Scroll the form into view whenever it opens. `behavior: 'smooth'`
-  // is friendlier than an instant jump, and `block: 'start'` puts the
-  // form heading near the top of the viewport.
   useEffect(() => {
     if (showForm && formRef.current) {
       formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [showForm]);
 
-  // Debounce the search box so we don't refilter on every keystroke.
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(handle);
   }, [search]);
 
-  // Verdict filter — driven by the dashboard widget's "View all" links.
-  // `?verdict=flaky`   → alternating-pattern cases (verdict in
-  //                      {possibly_flaky, flaky, very_flaky}).
-  // `?verdict=broken`  → regressions (verdict === 'broken').
-  // The dashboard widget uses the same `/test-cases/flaky` endpoint as
-  // its source of truth, so the case list intersects with that subset.
-  // Declared BEFORE the URL mirror effect so the effect can preserve
-  // the drill-in param when the user changes other filters.
   const verdictParam = params.get('verdict');
   const verdictFilter: 'flaky' | 'broken' | null =
     verdictParam === 'flaky' || verdictParam === 'broken' ? verdictParam : null;
   const flakyQ = useFlakyList(50);
 
-  // Mirror filters into the URL (replace, not push — back-button stays useful).
-  // Preserve any existing `verdict` param so the dashboard drill-in
-  // (`?verdict=flaky` / `?verdict=broken`) survives interaction with the
-  // other filters on this page — without this, the very first render
-  // of /cases?verdict=flaky would lose the param before the banner
-  // could mount.
   useEffect(() => {
     const next = new URLSearchParams();
     if (debouncedSearch) next.set('q', debouncedSearch);
@@ -124,6 +109,7 @@ export function CaseListPage() {
     if (verdictFilter) next.set('verdict', verdictFilter);
     setParams(next, { replace: true });
   }, [debouncedSearch, status, priority, sort, verdictFilter, setParams]);
+
   const verdictIds = useMemo(() => {
     if (!verdictFilter) return null;
     const cases = flakyQ.data?.cases ?? [];
@@ -143,17 +129,9 @@ export function CaseListPage() {
 
   const visible = useMemo(() => {
     let out: CaseData[] = cases;
-
     if (status !== 'all') out = out.filter((c) => c.status === status);
     if (priority !== 'all') out = out.filter((c) => c.priority === priority);
-
-    // Verdict drill-in filter — intersect with the dashboard widget's
-    // subset. Skip if data hasn't loaded yet; the banner handles the
-    // loading state for the user.
-    if (verdictIds) {
-      out = out.filter((c) => verdictIds.has(c.id));
-    }
-
+    if (verdictIds) out = out.filter((c) => verdictIds.has(c.id));
     const q = debouncedSearch.trim().toLowerCase();
     if (q) {
       out = out.filter(
@@ -163,7 +141,6 @@ export function CaseListPage() {
           (c.tags ?? []).some((t) => t.toLowerCase().includes(q)),
       );
     }
-
     const [field, dir] = sort.split('_');
     const sorted = [...out].sort((a, b) => {
       let av: number | string;
@@ -226,18 +203,15 @@ export function CaseListPage() {
     const ids = pendingDelete;
     setPendingDelete(null);
     try {
-      // Sequential — the optimistic cache update in useDeleteCase
-      // removes each row as it succeeds, so the list shrinks live.
       for (const id of ids) await deleteM.mutateAsync(id);
       setSelected((prev) => {
         const next = new Set(prev);
         for (const id of ids) next.delete(id);
         return next;
       });
-      const message =
-        ids.length === 1
-          ? 'Moved to Trash — open /trash to restore'
-          : `Moved ${ids.length} test cases to Trash`;
+      const message = ids.length === 1
+        ? 'Moved to Trash — open /trash to restore'
+        : `Moved ${ids.length} test cases to Trash`;
       showToast({
         message,
         variant: 'success',
@@ -270,34 +244,32 @@ export function CaseListPage() {
   const noMatches = !casesQ.isLoading && cases.length > 0 && visible.length === 0;
 
   return (
-    <section>
+    <div className="space-y-6">
+      {/* Banners */}
       {user?.role === 'viewer' && (
         <div
           data-cy="readonly-banner"
-          className="mb-4 rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800"
+          className="rg-pill rg-pill-warning px-3 py-2 flex items-center gap-2"
         >
-          Read-only mode — your role is <strong>viewer</strong>. Create, edit, and
-          delete actions are disabled.
+          <Icon.Lock size={14} />
+          <span className="text-sm">
+            Read-only mode — your role is <strong>viewer</strong>. Create, edit, and
+            delete actions are disabled.
+          </span>
         </div>
       )}
       {verdictFilter && (
         <div
           data-cy="verdict-filter-banner"
           data-verdict={verdictFilter}
-          className={`mb-4 flex items-center justify-between rounded border px-3 py-2 text-sm ${
+          className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
             verdictFilter === 'broken'
-              ? 'border-rose-300 bg-rose-50 text-rose-900'
-              : 'border-orange-300 bg-orange-50 text-orange-900'
+              ? 'border-danger-border bg-danger-soft text-danger-text'
+              : 'border-warning-border bg-warning-soft text-warning-text'
           }`}
         >
           <div className="flex items-center gap-2">
-            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              {verdictFilter === 'broken' ? (
-                <path d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" />
-              ) : (
-                <path d="M5.5 16a3.5 3.5 0 01-.369-6.98 4 4 0 017.753-1.977A4.5 4.5 0 0113.5 16h-8z" />
-              )}
-            </svg>
+            <Icon.Flaky size={16} />
             <span>
               Showing{' '}
               <strong>
@@ -312,326 +284,331 @@ export function CaseListPage() {
             type="button"
             data-cy="verdict-filter-clear"
             onClick={clearVerdictFilter}
-            className={`rounded border px-2 py-0.5 text-xs font-medium ${
+            className={`rounded-md border px-2.5 py-0.5 text-xs font-medium ${
               verdictFilter === 'broken'
-                ? 'border-rose-400 hover:bg-rose-100'
-                : 'border-orange-400 hover:bg-orange-100'
+                ? 'border-danger-border bg-surface hover:bg-danger-soft'
+                : 'border-warning-border bg-surface hover:bg-warning-soft'
             }`}
           >
             Show all cases
           </button>
         </div>
       )}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Test Cases</h2>
-          <p className="text-sm text-gray-500">Manage individual test cases for your project</p>
-        </div>
-        <button
-          type="button"
-          data-cy="case-new-btn"
-          data-writable="true"
-          onClick={() => {
-            setEditing(null);
-            setShowForm((s) => !s);
-          }}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {showForm ? '− Cancel' : '+ New Test Case'}
-        </button>
-      </div>
+
+      {/* Header */}
+      <PageHeader
+        title="Test cases"
+        description="Browse, filter, edit and run all the test cases in this workspace."
+        actions={
+          <Button
+            variant="primary"
+            data-cy="case-new-btn"
+            data-writable="true"
+            leftIcon={showForm ? <Icon.X size={14} /> : <Icon.Plus size={14} />}
+            onClick={() => { setEditing(null); setShowForm((s) => !s); }}
+          >
+            {showForm ? 'Cancel' : 'New test case'}
+          </Button>
+        }
+      />
 
       {showForm && (
-        <div ref={formRef}>
+        <div ref={formRef} className="rg-fade-in">
           <CaseForm
             initial={editing ?? undefined}
             knownTags={knownTags}
             submitting={createM.isPending || updateM.isPending}
             onSubmit={(values) =>
-              editing ? handleUpdate(values as CaseUpdateInput) : handleCreate(values as CaseCreateInput)
+              editing
+                ? handleUpdate(values as CaseUpdateInput)
+                : handleCreate(values as CaseCreateInput)
             }
-            onCancel={() => {
-              setShowForm(false);
-              setEditing(null);
-            }}
+            onCancel={() => { setShowForm(false); setEditing(null); }}
           />
         </div>
       )}
 
-      <div data-cy="toolbar" className="mb-3 space-y-2 rounded border border-gray-200 bg-white p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="search" className="text-sm font-medium">
-            Search
-          </label>
-          <input
-            id="search"
-            data-cy="search-input"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, description, or tags…"
-            autoComplete="off"
-            className="min-w-[200px] flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-          />
-          {search && (
-            <button
-              type="button"
-              data-cy="clear-search-btn"
-              onClick={() => setSearch('')}
-              className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+      {/* Toolbar */}
+      <Card className="p-4">
+        <div data-cy="toolbar" className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[240px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+                <Icon.Search size={14} />
+              </span>
+              <input
+                id="search"
+                data-cy="search-input"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title, description, or tags…"
+                autoComplete="off"
+                className="rg-input pl-9"
+              />
+            </div>
+            {search && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-cy="clear-search-btn"
+                onClick={() => setSearch('')}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              Status
+            </span>
+            <div data-cy="status-filter" className="flex flex-wrap gap-1.5">
+              {(['all', ...STATUS_VALUES] as const).map((v) => (
+                <Chip
+                  key={v}
+                  data-cy="status-chip"
+                  value={v}
+                  label={v}
+                  active={status === v}
+                  onClick={() => setStatus(v)}
+                />
+              ))}
+            </div>
+            <span className="ml-2 text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              Priority
+            </span>
+            <div data-cy="priority-filter" className="flex flex-wrap gap-1.5">
+              {(['all', ...PRIORITY_VALUES] as const).map((v) => (
+                <Chip
+                  key={v}
+                  data-cy="priority-chip"
+                  value={v}
+                  label={v}
+                  active={priority === v}
+                  onClick={() => setPriority(v)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort" className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              Sort
+            </label>
+            <select
+              id="sort"
+              data-cy="sort-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="rg-input w-auto py-1.5 text-sm"
             >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">Status</span>
-          <div data-cy="status-filter" className="flex flex-wrap gap-1">
-            {(['all', ...STATUS_VALUES] as const).map((v) => (
-              <Chip
-                key={v}
-                data-cy="status-chip"
-                value={v}
-                label={v}
-                active={status === v}
-                onClick={() => setStatus(v)}
-              />
-            ))}
-          </div>
-          <span className="ml-2 text-sm font-medium">Priority</span>
-          <div data-cy="priority-filter" className="flex flex-wrap gap-1">
-            {(['all', ...PRIORITY_VALUES] as const).map((v) => (
-              <Chip
-                key={v}
-                data-cy="priority-chip"
-                value={v}
-                label={v}
-                active={priority === v}
-                onClick={() => setPriority(v)}
-              />
-            ))}
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="title_asc">Title (A→Z)</option>
+              <option value="title_desc">Title (Z→A)</option>
+              <option value="priority_desc">Priority (high→low)</option>
+            </select>
           </div>
         </div>
+      </Card>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="sort" className="text-sm font-medium">
-            Sort by
-          </label>
-          <select
-            id="sort"
-            data-cy="sort-select"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded border border-gray-300 px-2 py-1 text-sm"
-          >
-            <option value="created_desc">Newest first</option>
-            <option value="created_asc">Oldest first</option>
-            <option value="title_asc">Title (A→Z)</option>
-            <option value="title_desc">Title (Z→A)</option>
-            <option value="priority_desc">Priority (high→low)</option>
-          </select>
-        </div>
-      </div>
-
-      <div data-cy="result-count" className="mb-2 text-sm text-gray-600">
+      <div data-cy="result-count" className="text-sm text-text-secondary">
         Showing <strong data-cy="result-count-value">{visible.length}</strong> of{' '}
         <span data-cy="result-total">{cases.length}</span>
       </div>
 
-      {/* Bulk bar is always rendered; hidden via CSS when nothing is
-          selected so its [data-cy] element remains queryable. */}
+      {/* Bulk bar — always rendered (display: none when empty) so its
+          data-cy element remains queryable. */}
       <div
         data-cy="bulk-bar"
         data-selected-size={selected.size}
         style={{ display: selected.size > 0 ? undefined : 'none' }}
-        className="mb-2 flex items-center justify-between rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+        className="flex items-center justify-between rounded-lg border border-brand-soft bg-brand-soft px-3 py-2 text-sm text-brand-hover"
       >
-          <span>
-            <strong data-cy="bulk-count">{selected.size}</strong> selected
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              data-cy="bulk-clear"
-              onClick={() => setSelected(new Set())}
-              className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-white"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              data-cy="bulk-delete"
-              data-writable="true"
-              onClick={() => setPendingDelete([...selected])}
-              className="rounded bg-red-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </div>
+        <span>
+          <strong data-cy="bulk-count">{selected.size}</strong> selected
+        </span>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-cy="bulk-clear"
+            onClick={() => setSelected(new Set())}
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            data-cy="bulk-delete"
+            data-writable="true"
+            onClick={() => setPendingDelete([...selected])}
+            leftIcon={<Icon.Trash size={12} />}
+          >
+            Delete
+          </Button>
+        </div>
       </div>
 
-      {casesQ.isLoading && (
-        <div className="py-6 text-center text-sm text-gray-500">Loading test cases…</div>
-      )}
+      {/* List */}
+      <Card className="overflow-hidden">
+        {casesQ.isLoading && <div className="p-4"><SkeletonRows rows={4} /></div>}
 
-      {noCasesAtAll && (
-        <div
-          data-cy="empty-no-cases"
-          className="py-6 text-center text-sm text-gray-500"
-        >
-          No test cases yet. Click “+ New Test Case” to create one.
-        </div>
-      )}
+        {noCasesAtAll && (
+          <div data-cy="empty-no-cases" className="p-8">
+            <EmptyState
+              icon={<Icon.Cases size={20} />}
+              title="No test cases yet"
+              description="Create your first test case to start tracking what your product should do."
+              action={
+                <Button
+                  variant="primary"
+                  data-cy="case-new-btn"
+                  data-writable="true"
+                  leftIcon={<Icon.Plus size={14} />}
+                  onClick={() => { setEditing(null); setShowForm(true); }}
+                >
+                  New test case
+                </Button>
+              }
+            />
+          </div>
+        )}
 
-      {noMatches && (
-        <div
-          data-cy="empty-no-matches"
-          className="py-6 text-center text-sm text-gray-500"
-        >
-          No test cases match the current filters.{' '}
-          <button
-            type="button"
-            data-cy="reset-filters"
-            onClick={resetFilters}
-            className="text-blue-600 hover:underline"
-          >
-            Reset filters
-          </button>
-        </div>
-      )}
+        {noMatches && (
+          <div data-cy="empty-no-matches" className="p-8">
+            <EmptyState
+              icon={<Icon.Search size={20} />}
+              title="No matches"
+              description="No test cases match the current filters. Try widening the search."
+              action={
+                <Button
+                  variant="secondary"
+                  data-cy="reset-filters"
+                  onClick={resetFilters}
+                >
+                  Reset filters
+                </Button>
+              }
+            />
+          </div>
+        )}
 
-      {!casesQ.isLoading && visible.length > 0 && (
-        <ul data-cy="case-list" className="space-y-2">
-          {visible.map((c) => (
-            <li
-              key={c.id}
-              data-cy="case-row"
-              data-case-id={c.id}
-              data-priority={c.priority}
-              data-status={c.status}
-              data-result={c.result}
-              className={`flex items-start gap-3 rounded border bg-white p-3 ${
-                selected.has(c.id)
-                  ? 'border-blue-400 ring-2 ring-blue-200'
-                  : 'border-gray-200'
-              }`}
-            >
-              <input
-                type="checkbox"
-                data-cy="case-checkbox"
-                checked={selected.has(c.id)}
-                onChange={(e) => toggleSelect(c.id, e.target.checked)}
-                className="mt-1"
-                aria-label={`Select ${c.title}`}
-              />
+        {!casesQ.isLoading && visible.length > 0 && (
+          <ul data-cy="case-list" className="divide-y divide-border-soft">
+            {visible.map((c) => (
+              <li
+                key={c.id}
+                data-cy="case-row"
+                data-case-id={c.id}
+                data-priority={c.priority}
+                data-status={c.status}
+                data-result={c.result}
+                className={`group transition-colors ${
+                  selected.has(c.id) ? 'bg-brand-soft/40' : 'hover:bg-surface-hover'
+                }`}
+              >
+                <div className="flex items-start gap-4 px-4 py-3.5">
+                  <input
+                    type="checkbox"
+                    data-cy="case-checkbox"
+                    checked={selected.has(c.id)}
+                    onChange={(e) => toggleSelect(c.id, e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-border text-brand focus:ring-brand"
+                    aria-label={`Select ${c.title}`}
+                  />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    to={`/cases/${c.id}`}
-                    data-cy="case-title"
-                    className="break-words font-medium text-gray-900 hover:text-blue-600 hover:underline"
-                  >
-                    {highlight(c.title, debouncedSearch)}
-                  </Link>
-                  <button
-                    type="button"
-                    data-cy="case-run-btn"
-                    data-id={c.id}
-                    data-writable="true"
-                    onClick={() => cycleRun(c)}
-                    title="Click to cycle run result"
-                    className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium uppercase tracking-wide result-${c.result} ${
-                      c.result === 'passed'
-                        ? 'bg-green-100 text-green-800'
-                        : c.result === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {c.result.replace('_', ' ')}
-                  </button>
-                </div>
-
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                  <span
-                    data-cy="case-status"
-                    className={`rounded px-1.5 py-0.5 status-${c.status} ${
-                      c.status === 'active'
-                        ? 'bg-blue-100 text-blue-800'
-                        : c.status === 'deprecated'
-                          ? 'bg-gray-200 text-gray-600'
-                          : 'bg-yellow-100 text-yellow-800'
-                    }`}
-                  >
-                    {c.status}
-                  </span>
-                  <span
-                    data-cy="case-priority"
-                    className={`rounded px-1.5 py-0.5 priority-${c.priority} ${
-                      c.priority === 'high'
-                        ? 'bg-red-100 text-red-800'
-                        : c.priority === 'medium'
-                          ? 'bg-orange-100 text-orange-800'
-                          : 'bg-green-100 text-green-800'
-                    }`}
-                  >
-                    {c.priority}
-                  </span>
-                  <span data-cy="case-steps-count">
-                    {(c.steps?.length ?? 0)} step{(c.steps?.length ?? 0) === 1 ? '' : 's'}
-                  </span>
-                  <FlakinessBadge caseId={c.id} onlyWhenInteresting />
-                </div>
-
-                {(c.tags ?? []).length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {(c.tags ?? []).map((t) => (
-                      <span
-                        key={t}
-                        data-cy="case-tag"
-                        className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700"
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <Link
+                        to={`/cases/${c.id}`}
+                        data-cy="case-title"
+                        className="font-medium text-text hover:text-brand transition-colors break-words"
                       >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        {highlight(c.title, debouncedSearch)}
+                      </Link>
+                      <button
+                        type="button"
+                        data-cy="case-run-btn"
+                        data-id={c.id}
+                        data-writable="true"
+                        onClick={() => cycleRun(c)}
+                        title="Click to cycle run result"
+                        className={`shrink-0 result-${c.result}`}
+                      >
+                        <ResultPill result={c.result} size="sm" />
+                      </button>
+                    </div>
 
-              <div className="flex shrink-0 flex-col gap-1">
-                <button
-                  type="button"
-                  data-cy="case-edit-btn"
-                  data-action="edit-case"
-                  data-id={c.id}
-                  data-writable="true"
-                  onClick={() => {
-                    setEditing(c);
-                    setShowForm(true);
-                  }}
-                  className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  data-cy="case-delete-btn"
-                  data-action="delete-case"
-                  data-id={c.id}
-                  data-writable="true"
-                  onClick={() => setPendingDelete([c.id])}
-                  className="rounded border border-gray-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
-                  title="Delete"
-                >
-                  ×
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span data-cy="case-status">
+                        <StatusPill status={c.status} size="sm" />
+                      </span>
+                      <span data-cy="case-priority">
+                        <PriorityPill priority={c.priority ?? 'medium'} size="sm" />
+                      </span>
+                      <span data-cy="case-steps-count" className="text-xs text-text-tertiary">
+                        {c.steps?.length ?? 0} step{(c.steps?.length ?? 0) === 1 ? '' : 's'}
+                      </span>
+                      <FlakinessBadge caseId={c.id} onlyWhenInteresting />
+                    </div>
+
+                    {(c.tags ?? []).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {(c.tags ?? []).map((t) => (
+                          <Pill
+                            key={t}
+                            tone="brand"
+                            size="sm"
+                            data-cy="case-tag"
+                            className="!py-0"
+                          >
+                            {t}
+                          </Pill>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      data-cy="case-edit-btn"
+                      data-action="edit-case"
+                      data-id={c.id}
+                      data-writable="true"
+                      onClick={() => { setEditing(c); setShowForm(true); }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-cy="case-delete-btn"
+                      data-action="delete-case"
+                      data-id={c.id}
+                      data-writable="true"
+                      onClick={() => setPendingDelete([c.id])}
+                      className="!text-danger-text hover:!bg-danger-soft"
+                      title="Delete"
+                      aria-label="Delete"
+                    >
+                      <Icon.X size={14} />
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       {pendingDelete && (
         <ConfirmModal
@@ -653,14 +630,16 @@ export function CaseListPage() {
       )}
 
       {/* Defensive: keep RESULT_VALUES referenced so an unused-import
-          lint doesn't drop the constant — it's also exported from
-          ./api for any future sibling pages that need it. */}
+          lint doesn't drop the constant — also exported from ./api for
+          any future sibling pages that need it. */}
       {void RESULT_VALUES[0]}
-    </section>
+    </div>
   );
 }
 
-// ---- helpers ----
+// =============================================================================
+// helpers
+// =============================================================================
 
 interface ChipProps {
   'data-cy': string;
@@ -672,18 +651,19 @@ interface ChipProps {
 
 function Chip({ value, label, active, onClick, ...rest }: ChipProps) {
   return (
-    <span
+    <button
+      type="button"
       {...rest}
       data-value={value}
       onClick={onClick}
-      className={`cursor-pointer select-none rounded-full border px-3 py-0.5 text-xs capitalize ${
+      className={`cursor-pointer select-none rounded-full border px-3 py-0.5 text-xs capitalize transition-colors ${
         active
-          ? 'border-blue-600 bg-blue-600 text-white active'
-          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          ? 'border-brand bg-brand text-text-inverse active'
+          : 'border-border bg-surface text-text-secondary hover:bg-surface-hover hover:border-border-strong'
       }`}
     >
       {label}
-    </span>
+    </button>
   );
 }
 
@@ -695,12 +675,11 @@ function priorityRank(p: string): number {
 
 function highlight(text: string, q: string): React.ReactNode {
   if (!q) return text;
-  // Escape regex metachars in the query so users can search for "(" etc.
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
   return parts.map((part, i) =>
     part.toLowerCase() === q.toLowerCase() ? (
-      <mark key={i} className="hl rounded bg-yellow-200 px-0.5">
+      <mark key={i} className="hl rounded bg-yellow-200 px-0.5 text-text">
         {part}
       </mark>
     ) : (

@@ -8,6 +8,8 @@
 
 import { useState } from 'react';
 
+import { Pill } from '@/components/Pill';
+
 interface TagInputProps {
   value: string[];
   onChange: (next: string[]) => void;
@@ -32,23 +34,29 @@ export function TagInput({ value, onChange, suggestions = [] }: TagInputProps) {
   }
 
   const matches = input.trim()
-    ? suggestions.filter(
-        (s) => s.toLowerCase().includes(input.toLowerCase()) && !value.includes(s),
-      ).slice(0, 6)
+    ? suggestions
+        .filter(
+          (s) => s.toLowerCase().includes(input.toLowerCase()) && !value.includes(s),
+        )
+        .slice(0, 6)
     : [];
 
   return (
-    <div className="relative flex flex-wrap items-center gap-1 rounded border border-gray-300 px-2 py-1">
+    <div className="relative flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--color-brand-soft)]">
       {value.map((t) => (
-        <span
+        <button
           key={t}
+          type="button"
           data-cy="tag-chip"
           onClick={() => remove(t)}
-          className="cursor-pointer rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800 hover:bg-blue-200"
           title="Click to remove"
+          className="group inline-flex items-center gap-1"
         >
-          {t} ×
-        </span>
+          <Pill tone="brand" size="sm" className="!py-0 group-hover:opacity-80">
+            {t}
+            <span className="ml-0.5 opacity-50 group-hover:opacity-100">×</span>
+          </Pill>
+        </button>
       ))}
       <input
         data-cy="tag-input"
@@ -69,12 +77,12 @@ export function TagInput({ value, onChange, suggestions = [] }: TagInputProps) {
           }
         }}
         placeholder="Add tag…"
-        className="min-w-[100px] flex-1 border-0 px-1 py-1 text-sm outline-none"
+        className="min-w-[100px] flex-1 border-0 bg-transparent px-1 py-1 text-sm text-text outline-none placeholder:text-text-tertiary"
       />
       {open && matches.length > 0 && (
         <div
           data-cy="tag-suggestions"
-          className="absolute left-0 top-full z-10 mt-1 w-48 rounded border border-gray-200 bg-white py-1 shadow"
+          className="absolute left-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-pop"
         >
           {matches.map((m) => (
             <button
@@ -87,7 +95,7 @@ export function TagInput({ value, onChange, suggestions = [] }: TagInputProps) {
                 e.preventDefault();
                 add(m);
               }}
-              className="block w-full px-3 py-1 text-left text-sm hover:bg-gray-100"
+              className="block w-full px-3 py-1.5 text-left text-sm text-text hover:bg-surface-hover"
             >
               {m}
             </button>

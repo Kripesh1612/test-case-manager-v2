@@ -13,15 +13,13 @@ import { z } from 'zod';
 
 import { testCaseSchema } from '@shared/schemas/testCase';
 
+import { Button } from '@/components/Button';
+
 import type { CaseData } from './api';
 import { TagInput } from './TagInput';
 
-// testCaseSchema has a `.transform()` on executable_snippet (collapses '' to
-// null), which means `z.infer` gives the OUTPUT type (`string | null`) but
-// the form state holds the INPUT type (`string | null | undefined`). Pin
-// both so RHF's resolver and submit handler line up.
-type FormValues = z.infer<typeof testCaseSchema>;     // submit-handler type (output)
-type FormInput = z.input<typeof testCaseSchema>;     // form-state type (input)
+type FormValues = z.infer<typeof testCaseSchema>;
+type FormInput = z.input<typeof testCaseSchema>;
 
 interface CaseFormProps {
   initial?: CaseData;
@@ -48,10 +46,6 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
       status: initial?.status ?? 'draft',
       priority: initial?.priority ?? 'medium',
       tags: initial?.tags ?? [],
-      // Phase 8 — bound to the new optional snippet field. Defaulting to
-      // '' (not null) matches the schema's transform that collapses '' to
-      // null on submit, so the form behaves identically regardless of
-      // which slot the user opens.
       executable_snippet: initial?.executable_snippet ?? '',
     },
   });
@@ -63,16 +57,21 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
     <form
       data-cy="case-form"
       onSubmit={handleSubmit(onSubmit)}
-      className="mb-4 space-y-3 rounded border border-gray-200 bg-white p-4"
+      className="rg-card space-y-4 p-5"
     >
-      <h3 className="text-base font-semibold">{initial ? 'Edit Test Case' : 'New Test Case'}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-text">
+          {initial ? 'Edit test case' : 'New test case'}
+        </h3>
+      </div>
 
-      <Field label="Title" error={errors.title?.message}>
+      <Field label="Title" required error={errors.title?.message}>
         <input
           data-cy="case-title-input"
           autoComplete="off"
+          placeholder="Short, descriptive"
           {...register('title')}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          className="rg-input"
         />
       </Field>
 
@@ -80,12 +79,13 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
         <textarea
           data-cy="case-description-input"
           rows={2}
+          placeholder="What is this case verifying?"
           {...register('description')}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          className="rg-input resize-y"
         />
       </Field>
 
-      <Field label="Steps (one per line)">
+      <Field label="Steps" hint="One per line — the order matters.">
         <textarea
           data-cy="case-steps-input"
           rows={4}
@@ -96,7 +96,7 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
               e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
             )
           }
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          className="rg-input resize-y font-mono text-xs"
         />
       </Field>
 
@@ -104,53 +104,53 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
         <textarea
           data-cy="case-expected-input"
           rows={2}
+          placeholder="What should happen when the steps pass?"
           {...register('expected_result')}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          className="rg-input resize-y"
         />
       </Field>
 
-      <Field label="Cypress snippet (optional)" error={errors.executable_snippet?.message}>
+      <Field
+        label="Cypress snippet (optional)"
+        error={errors.executable_snippet?.message}
+        hint="Optional Cypress test body. The server runs it via the “Run” button on the case detail page. Leave blank to make this a documentation-only case."
+      >
         <textarea
           data-cy="case-snippet-input"
           rows={6}
           placeholder="it('logs in', () => { cy.visit('/login'); ... })"
           {...register('executable_snippet')}
-          className="w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs focus:border-blue-500 focus:outline-none"
+          className="rg-input font-mono text-xs"
         />
-        <p className="mt-1 text-[11px] text-gray-500">
-          Optional Cypress test body. The server runs it via the
-          &ldquo;Run&rdquo; button on the case detail page. Leave blank to
-          make the case documentation-only.
-        </p>
       </Field>
 
-      <div className="flex gap-3">
-        <Field label="Status" className="flex-1">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Status">
           <select
             data-cy="case-status-input"
             {...register('status')}
-            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            className="rg-input"
           >
-            <option value="draft">draft</option>
-            <option value="active">active</option>
-            <option value="deprecated">deprecated</option>
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="deprecated">Deprecated</option>
           </select>
         </Field>
-        <Field label="Priority" className="flex-1">
+        <Field label="Priority">
           <select
             data-cy="case-priority-input"
             {...register('priority')}
-            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            className="rg-input"
           >
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
           </select>
         </Field>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Tags</label>
+        <label className="mb-1.5 block text-sm font-medium text-text">Tags</label>
         <TagInput
           value={tags}
           onChange={(next) => setValue('tags', next, { shouldValidate: true })}
@@ -158,23 +158,23 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
         />
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <button
+      <div className="flex items-center gap-2 pt-2 border-t border-border-soft">
+        <Button
           type="submit"
+          variant="primary"
           data-cy="case-submit-btn"
-          disabled={submitting}
-          className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          loading={submitting}
         >
-          {submitting ? 'Saving…' : initial ? 'Update' : 'Create'}
-        </button>
-        <button
+          {submitting ? 'Saving…' : initial ? 'Update test case' : 'Create test case'}
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
           data-cy="case-cancel-btn"
           onClick={onCancel}
-          className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -182,17 +182,26 @@ export function CaseForm({ initial, knownTags, submitting, onSubmit, onCancel }:
 
 interface FieldProps {
   label: string;
+  hint?: string;
   error?: string;
+  required?: boolean;
   className?: string;
   children: React.ReactNode;
 }
 
-function Field({ label, error, className, children }: FieldProps) {
+function Field({ label, hint, error, required, className, children }: FieldProps) {
   return (
     <div className={className}>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-text">
+        {label}
+        {required && <span className="ml-1 text-danger">*</span>}
+      </label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error ? (
+        <p className="mt-1.5 text-xs text-danger-text">{error}</p>
+      ) : hint ? (
+        <p className="mt-1.5 text-xs text-text-tertiary">{hint}</p>
+      ) : null}
     </div>
   );
 }

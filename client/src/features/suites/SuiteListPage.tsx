@@ -1,4 +1,5 @@
-// The Test Suites list page.
+// =============================================================================
+// /test-suites — the Test Suites list page.
 //
 // Brings together the toolbar (search + sort), the inline create/edit
 // form, the suite list, and the delete-confirm modal. State is local;
@@ -8,11 +9,20 @@
 // URL sync: search + sort are reflected in the query string so links
 // are shareable and so the Cypress UI tests can assert on the URL
 // after chip clicks.
+//
+// All existing data-cy hooks are preserved verbatim so the UI test
+// suite keeps passing without changes.
+// =============================================================================
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
+import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { EmptyState, SkeletonRows } from '@/components/EmptyState';
+import { Icon } from '@/components/Icons';
 import { ConfirmModal } from '@/components/Modal';
+import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
@@ -194,173 +204,251 @@ export function SuiteListPage() {
   };
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Test Suites</h2>
-          <p className="text-sm text-gray-500">Group related test cases into reusable suites</p>
-        </div>
-        <button
-          type="button"
-          data-cy="suite-new-btn"
-          data-writable
-          hidden={!writable}
-          onClick={openCreate}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + New Test Suite
-        </button>
-      </div>
-
-      <div data-cy="toolbar" className="mb-3 space-y-2 rounded border border-gray-200 bg-white p-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="suite-search" className="w-16 text-xs text-gray-600">
-            Search
-          </label>
-          <input
-            id="suite-search"
-            type="search"
-            data-cy="search-input"
-            placeholder="Search suite names or descriptions…"
-            autoComplete="off"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-          />
-          <button
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Test suites"
+        title="Test Suites"
+        description="Group related test cases into reusable suites you can run together."
+        actions={
+          <Button
             type="button"
-            data-cy="clear-search-btn"
-            hidden={!search}
-            onClick={() => setSearch('')}
-            className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+            variant="primary"
+            data-cy="suite-new-btn"
+            data-writable="true"
+            hidden={!writable}
+            leftIcon={formOpen ? <Icon.X size={14} /> : <Icon.Plus size={14} />}
+            onClick={formOpen ? closeForm : openCreate}
           >
-            Clear
-          </button>
+            {formOpen ? 'Cancel' : 'New test suite'}
+          </Button>
+        }
+      />
+
+      <Card className="p-4">
+        <div data-cy="toolbar" className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[240px]">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+                <Icon.Search size={14} />
+              </span>
+              <input
+                id="suite-search"
+                data-cy="search-input"
+                type="search"
+                placeholder="Search suite names or descriptions…"
+                autoComplete="off"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="rg-input pl-9"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-cy="clear-search-btn"
+              hidden={!search}
+              onClick={() => setSearch('')}
+            >
+              Clear
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              Sort
+            </span>
+            <div className="relative flex-1 min-w-[200px]">
+              <select
+                id="suite-sort"
+                data-cy="sort-select"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="rg-input w-full appearance-none pr-9"
+              >
+                {SORT_VALUES.map((k) => (
+                  <option key={k} value={k}>
+                    {SORT_LABELS[k]}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+                <Icon.Chevron size={14} />
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="suite-sort" className="w-16 text-xs text-gray-600">
-            Sort by
-          </label>
-          <select
-            id="suite-sort"
-            data-cy="sort-select"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-          >
-            {SORT_VALUES.map((k) => (
-              <option key={k} value={k}>
-                {SORT_LABELS[k]}
-              </option>
-            ))}
-          </select>
-        </div>
+      </Card>
+
+      <div data-cy="result-count" className="flex items-center justify-between text-sm text-text-secondary">
+        <span>
+          Showing <strong data-cy="result-count-value" className="text-text">{visible.length}</strong> of{' '}
+          <span data-cy="result-total" className="text-text">{suites.length}</span> suite
+          {suites.length === 1 ? '' : 's'}
+        </span>
       </div>
 
-      <div data-cy="result-count" className="mb-3 text-sm text-gray-700">
-        Showing <strong data-cy="result-count-value">{visible.length}</strong> of{' '}
-        <span data-cy="result-total">{suites.length}</span>
-      </div>
-
-      <form
+      <div
         data-cy="suite-form"
         hidden={!formOpen}
-        onSubmit={submitForm}
-        className="mb-4 space-y-2 rounded border border-gray-200 bg-white p-3"
+        className="rg-fade-in"
       >
-        <h3 className="text-sm font-semibold">
-          {editingId !== null ? 'Edit Test Suite' : 'New Test Suite'}
-        </h3>
-        <input
-          name="name"
-          data-cy="suite-name-input"
-          placeholder="Suite name"
-          required
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-        />
-        <textarea
-          name="description"
-          data-cy="suite-description-input"
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-        />
-        <label className="block text-xs text-gray-700">
-          Test cases (Ctrl/Cmd-click to select multiple)
-          <select
-            multiple
-            size={8}
-            data-cy="suite-cases-select"
-            value={form.test_case_ids.map(String)}
-            onChange={(e) => {
-              const ids = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
-              setForm((f) => ({ ...f, test_case_ids: ids }));
-            }}
-            className="mt-1 block w-full rounded border border-gray-300 px-2 py-1 text-sm"
-          >
-            {allCases.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex justify-end gap-2">
-          <button
-            type="submit"
-            data-cy="suite-submit-btn"
-            disabled={createM.isPending || updateM.isPending}
-            className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {editingId !== null ? 'Update' : 'Create'}
-          </button>
-          <button
-            type="button"
-            data-cy="suite-cancel-btn"
-            onClick={closeForm}
-            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+        <Card className="p-5">
+          <form onSubmit={submitForm} className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-soft text-brand">
+                <Icon.Suites size={14} />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-text">
+                  {editingId !== null ? 'Edit test suite' : 'New test suite'}
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Pick a name and the cases that belong to this suite.
+                </p>
+              </div>
+            </div>
 
-      <ul data-cy="suite-list" className="divide-y divide-gray-100 rounded border border-gray-200 bg-white">
-        {suites.length === 0 ? (
-          <li
-            data-cy="empty-no-suites"
-            className="px-3 py-6 text-center text-sm text-gray-500"
-          >
-            No test suites yet. Click &quot;+ New Test Suite&quot; to create one.
-          </li>
-        ) : visible.length === 0 ? (
-          <li data-cy="empty-no-matches" className="px-3 py-6 text-center text-sm text-gray-500">
-            No suites match the current search.{' '}
-            <button
-              type="button"
-              data-cy="reset-filters"
-              onClick={resetFilters}
-              className="ml-2 rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
-            >
-              Reset
-            </button>
-          </li>
+            <div className="space-y-1.5">
+              <label htmlFor="suite-name" className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                Name
+              </label>
+              <input
+                id="suite-name"
+                name="name"
+                data-cy="suite-name-input"
+                placeholder="Suite name"
+                required
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                className="rg-input"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="suite-description" className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                Description
+              </label>
+              <textarea
+                id="suite-description"
+                name="description"
+                data-cy="suite-description-input"
+                placeholder="What does this suite cover?"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+                className="rg-input resize-y"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="suite-cases" className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                Test cases <span className="text-text-tertiary/70 normal-case">(Ctrl/Cmd-click to select multiple)</span>
+              </label>
+              <select
+                id="suite-cases"
+                multiple
+                size={8}
+                data-cy="suite-cases-select"
+                value={form.test_case_ids.map(String)}
+                onChange={(e) => {
+                  const ids = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
+                  setForm((f) => ({ ...f, test_case_ids: ids }));
+                }}
+                className="rg-input font-mono text-xs"
+              >
+                {allCases.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              {form.test_case_ids.length > 0 && (
+                <p className="text-xs text-text-secondary">
+                  {form.test_case_ids.length} case{form.test_case_ids.length === 1 ? '' : 's'} selected
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="secondary"
+                data-cy="suite-cancel-btn"
+                onClick={closeForm}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                data-cy="suite-submit-btn"
+                loading={createM.isPending || updateM.isPending}
+              >
+                {editingId !== null ? 'Update suite' : 'Create suite'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+
+      <Card className="overflow-hidden">
+        {suitesQ.isLoading ? (
+          <div className="p-4">
+            <SkeletonRows rows={4} />
+          </div>
         ) : (
-          visible.map((s) => (
-            <SuiteRow
-              key={s.id}
-              suite={s}
-              search={debouncedSearch}
-              writable={writable}
-              onEdit={() => openEdit(s)}
-              onDelete={() => setPendingDelete(s)}
-            />
-          ))
+          <>
+            {suites.length === 0 ? (
+              <div data-cy="empty-no-suites">
+                <EmptyState
+                  icon={<Icon.Suites size={20} />}
+                  title="No test suites yet"
+                  description={
+                    writable
+                      ? 'Click "New test suite" above to group related test cases.'
+                      : 'No test suites have been created in this workspace yet.'
+                  }
+                />
+              </div>
+            ) : null}
+            {suites.length > 0 && visible.length === 0 ? (
+              <div data-cy="empty-no-matches">
+                <EmptyState
+                  icon={<Icon.Search size={20} />}
+                  title="No suites match"
+                  description="Try a different search term or reset the filters."
+                  action={
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      data-cy="reset-filters"
+                      onClick={resetFilters}
+                    >
+                      Reset filters
+                    </Button>
+                  }
+                />
+              </div>
+            ) : null}
+            <ul
+              data-cy="suite-list"
+              className={`divide-y divide-border-soft ${visible.length === 0 ? 'hidden' : ''}`}
+            >
+              {visible.map((s) => (
+                <SuiteRow
+                  key={s.id}
+                  suite={s}
+                  search={debouncedSearch}
+                  writable={writable}
+                  onEdit={() => openEdit(s)}
+                  onDelete={() => setPendingDelete(s)}
+                />
+              ))}
+            </ul>
+          </>
         )}
-      </ul>
+      </Card>
 
       {pendingDelete && (
         <ConfirmModal
@@ -372,7 +460,7 @@ export function SuiteListPage() {
           onCancel={() => setPendingDelete(null)}
         />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -382,7 +470,7 @@ function highlight(text: string, q: string) {
   const parts = text.split(re);
   return parts.map((p, i) =>
     i % 2 === 1 ? (
-      <mark key={i} className="bg-yellow-100">
+      <mark key={i} className="rounded bg-warning-soft px-0.5 text-text">
         {p}
       </mark>
     ) : (
@@ -405,55 +493,75 @@ interface SuiteRowProps {
 
 function SuiteRow({ suite, search, writable, onEdit, onDelete }: SuiteRowProps) {
   const desc = suite.description ?? '';
-  const descSlice = desc.length > 60 ? `${desc.slice(0, 60)}…` : desc;
+  const descSlice = desc.length > 120 ? `${desc.slice(0, 120)}…` : desc;
   const count = suite.test_case_ids.length;
   return (
-    <li data-cy="suite-row" data-suite-id={suite.id} className="p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-medium">
-            <Link
-              to={`/suites/${suite.id}`}
-              data-cy="suite-name-link"
-              className="text-inherit no-underline hover:underline"
-            >
-              {highlight(suite.name, search)}
-            </Link>
-          </h3>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-            <span data-cy="suite-case-count">
-              {count} test case{count === 1 ? '' : 's'}
+    <li
+      data-cy="suite-row"
+      data-suite-id={suite.id}
+      className="group transition-colors hover:bg-surface-hover"
+    >
+      <div className="flex items-start justify-between gap-4 px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+              <Icon.Suites size={16} />
             </span>
-            {descSlice && (
-              <>
-                <span>·</span>
-                <span data-cy="suite-description">{highlight(descSlice, search)}</span>
-              </>
-            )}
+            <div className="min-w-0 flex-1">
+              <Link
+                to={`/suites/${suite.id}`}
+                data-cy="suite-name-link"
+                className="block truncate font-medium text-text transition-colors hover:text-brand"
+              >
+                {highlight(suite.name, search)}
+              </Link>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                <span
+                  data-cy="suite-case-count"
+                  className="inline-flex items-center gap-1.5"
+                >
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" />
+                  {count} test case{count === 1 ? '' : 's'}
+                </span>
+                {descSlice && (
+                  <>
+                    <span className="text-text-tertiary">·</span>
+                    <span data-cy="suite-description" className="truncate">
+                      {highlight(descSlice, search)}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex gap-1">
-          <button
+        <div className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             data-cy="suite-edit-btn"
-            data-writable
+            data-writable="true"
             hidden={!writable}
             onClick={onEdit}
-            className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
+            leftIcon={<Icon.Edit size={12} />}
           >
             Edit
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             data-cy="suite-delete-btn"
-            data-writable
+            data-writable="true"
             hidden={!writable}
             onClick={onDelete}
             title="Delete"
-            className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
+            aria-label="Delete"
+            className="!text-danger-text hover:!bg-danger-soft"
           >
-            ×
-          </button>
+            <Icon.X size={14} />
+          </Button>
         </div>
       </div>
     </li>

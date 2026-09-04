@@ -1,19 +1,23 @@
 // The Suite detail page (/suites/:id).
 //
-// Mirrors public/suite-detail.html UX. Shows suite name + description,
-// stat grid (cases in suite / passed / failed / not run), the member
-// cases list with a cycle-run button per row, an add-case toolbar, and
-// the Run-All action. Confirmation modal for remove + run-all.
+// Layout:
+//   • Breadcrumb + header with name, description, "Run all" CTA
+//   • 4 stat tiles (cases / passed / failed / not run)
+//   • Add-cases toolbar (select + Add button)
+//   • Member cases list with cycle-run + remove per row
 
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ConfirmModal } from '@/components/Modal';
+import { Card } from '@/components/Card';
+import { Button } from '@/components/Button';
+import { Pill, ResultPill, StatusPill, PriorityPill } from '@/components/Pill';
+import { Icon } from '@/components/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
-import { useCases } from '@/features/cases/hooks';
-import { useUpdateCase } from '@/features/cases/hooks';
+import { useCases, useUpdateCase } from '@/features/cases/hooks';
 import type { CaseData } from '@/features/cases/api';
 
 import type { Suite } from './api';
@@ -114,56 +118,74 @@ export function SuiteDetailPage() {
 
   if (!suite) {
     return (
-      <section>
-        <p className="text-sm text-gray-500">Loading suite…</p>
-      </section>
+      <div className="flex items-center justify-center py-16 text-sm text-text-secondary">
+        <span className="rg-spin inline-block h-4 w-4 mr-2 rounded-full border-2 border-brand border-t-transparent" />
+        Loading suite…
+      </div>
     );
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <Link
-            to="/suites"
-            data-cy="back-to-suites"
-            className="text-xs text-blue-600 hover:underline"
-          >
-            ← Back to suites
-          </Link>
-          <h2 data-cy="suite-name" className="text-2xl font-semibold">
-            {suite.name}
-          </h2>
-          {suite.description && (
-            <p data-cy="suite-description" className="text-sm text-gray-500">
-              {suite.description}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          data-cy="run-all-btn"
-          data-writable
-          hidden={!writable}
-          disabled={runM.isPending || memberCases.length === 0}
-          onClick={() => setPending({ kind: 'run-all' })}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-xs">
+        <Link
+          to="/suites"
+          data-cy="back-to-suites"
+          className="inline-flex items-center gap-1 text-text-secondary hover:text-text"
         >
-          ▶ Run All (mark passed)
-        </button>
+          <Icon.Chevron size={12} className="rotate-180" />
+          All suites
+        </Link>
+        <span className="text-text-tertiary">/</span>
+        <span className="text-text-secondary">{suite.name}</span>
+      </nav>
+
+      {/* Header */}
+      <Card className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              <span className="rounded bg-surface-sunken px-2 py-0.5">Test suite</span>
+              <span>#{suite.id}</span>
+            </div>
+            <h2 data-cy="suite-name" className="mt-2 text-2xl font-semibold tracking-tight text-text">
+              {suite.name}
+            </h2>
+            {suite.description && (
+              <p data-cy="suite-description" className="mt-1 text-sm text-text-secondary">
+                {suite.description}
+              </p>
+            )}
+          </div>
+          <Button
+            variant="brand"
+            data-cy="run-all-btn"
+            data-writable="true"
+            hidden={!writable}
+            disabled={runM.isPending || memberCases.length === 0}
+            loading={runM.isPending}
+            leftIcon={<Icon.Run size={14} />}
+            onClick={() => setPending({ kind: 'run-all' })}
+          >
+            Run all
+          </Button>
+        </div>
+      </Card>
+
+      {/* Stat tiles */}
+      <div data-cy="suite-stats" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile cy="stat-suite-case-count" label="Cases in suite" value={stats.total} icon={<Icon.Suites size={16} />} tone="neutral" />
+        <StatTile cy="stat-suite-passed" label="Passed" value={stats.passed} icon={<Icon.Check size={16} />} tone="success" />
+        <StatTile cy="stat-suite-failed" label="Failed" value={stats.failed} icon={<Icon.X size={16} />} tone="danger" />
+        <StatTile cy="stat-suite-notrun" label="Not run" value={stats.notRun} icon={<Icon.Pause size={16} />} tone="warning" />
       </div>
 
-      <div data-cy="suite-stats" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <StatTile cy="stat-suite-case-count" label="Cases in suite" value={stats.total} />
-        <StatTile cy="stat-suite-passed" label="Passed" value={stats.passed} />
-        <StatTile cy="stat-suite-failed" label="Failed" value={stats.failed} />
-        <StatTile cy="stat-suite-notrun" label="Not run" value={stats.notRun} />
-      </div>
-
-      <div data-cy="add-cases-toolbar" className="mb-4 rounded border border-gray-200 bg-white p-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="add-case-select" className="text-xs text-gray-600">
-            Add test cases to this suite
+      {/* Add-cases toolbar */}
+      <Card className="p-4">
+        <div data-cy="add-cases-toolbar" className="flex flex-wrap items-center gap-2">
+          <label htmlFor="add-case-select" className="text-sm font-medium text-text-secondary">
+            Add test cases
           </label>
           <select
             id="add-case-select"
@@ -171,13 +193,11 @@ export function SuiteDetailPage() {
             value={pendingAddId}
             onChange={(e) => setPendingAddId(Number(e.target.value))}
             disabled={!writable}
-            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+            className="rg-input flex-1 min-w-[200px]"
           >
             <option value={0}>— pick a test case —</option>
             {candidates.length === 0 ? (
-              <option value={0} disabled>
-                — no more test cases to add —
-              </option>
+              <option value={0} disabled>— no more test cases to add —</option>
             ) : (
               candidates.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -186,75 +206,81 @@ export function SuiteDetailPage() {
               ))
             )}
           </select>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             data-cy="add-case-btn"
             disabled={!writable || !pendingAddId || updateSuiteM.isPending}
             onClick={onAddCase}
-            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+            leftIcon={<Icon.Plus size={14} />}
           >
             Add
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      <ul
-        data-cy="suite-cases-list"
-        className="divide-y divide-gray-100 rounded border border-gray-200 bg-white"
-      >
+      {/* Member cases */}
+      <Card className="overflow-hidden">
         {memberCases.length === 0 ? (
-          <li
+          <div
             data-cy="empty-no-cases-in-suite"
-            className="px-3 py-6 text-center text-sm text-gray-500"
+            className="px-6 py-12 text-center text-sm text-text-secondary"
           >
             No test cases in this suite yet. Add some using the toolbar above.
-          </li>
+          </div>
         ) : (
-          memberCases.map((c) => (
-            <li key={c.id} data-cy="suite-case-row" data-case-id={c.id} className="p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 data-cy="suite-case-title" className="text-sm font-medium">
-                    {c.title}
-                  </h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                    <span className={`rounded px-1.5 py-0.5 status-${c.status}`}>
-                      {c.status}
-                    </span>
-                    <span className={`rounded px-1.5 py-0.5 priority-${c.priority ?? 'medium'}`}>
-                      {c.priority ?? 'medium'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
+          <ul data-cy="suite-cases-list" className="divide-y divide-border-soft">
+            {memberCases.map((c) => (
+              <li
+                key={c.id}
+                data-cy="suite-case-row"
+                data-case-id={c.id}
+                className="group transition-colors hover:bg-surface-hover"
+              >
+                <div className="flex items-start gap-4 px-4 py-3.5">
+                  <Link
+                    to={`/cases/${c.id}`}
+                    data-cy="suite-case-title"
+                    className="min-w-0 flex-1"
+                  >
+                    <div className="text-sm font-medium text-text group-hover:text-brand transition-colors break-words">
+                      {c.title}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <StatusPill status={c.status} size="sm" />
+                      <PriorityPill priority={c.priority ?? 'medium'} size="sm" />
+                    </div>
+                  </Link>
                   <button
                     type="button"
                     data-cy="suite-case-run-btn"
-                    data-writable
+                    data-writable="true"
                     hidden={!writable}
                     onClick={() => onCycleRun(c)}
                     disabled={updateCaseM.isPending}
-                    className={`rounded px-2 py-0.5 text-xs result-${c.result}`}
+                    className={`result-${c.result}`}
                   >
-                    {c.result.replace('_', ' ')}
+                    <ResultPill result={c.result} size="sm" />
                   </button>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     data-cy="remove-case-btn"
-                    data-writable
+                    data-writable="true"
                     hidden={!writable}
                     onClick={() => setPending({ kind: 'remove', caseId: c.id })}
                     title="Remove from suite"
-                    className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
+                    aria-label="Remove from suite"
+                    className="!text-danger-text hover:!bg-danger-soft"
                   >
-                    ×
-                  </button>
+                    <Icon.X size={14} />
+                  </Button>
                 </div>
-              </div>
-            </li>
-          ))
+              </li>
+            ))}
+          </ul>
         )}
-      </ul>
+      </Card>
 
       {pending?.kind === 'remove' && (
         <ConfirmModal
@@ -283,17 +309,48 @@ export function SuiteDetailPage() {
           onCancel={() => setPending(null)}
         />
       )}
-    </section>
+    </div>
   );
 }
 
-function StatTile({ cy, label, value }: { cy: string; label: string; value: number }) {
+function StatTile({
+  cy,
+  label,
+  value,
+  icon,
+  tone = 'neutral',
+}: {
+  cy: string;
+  label: string;
+  value: number;
+  icon?: React.ReactNode;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+}) {
+  const toneClasses: Record<typeof tone, string> = {
+    neutral: 'text-text',
+    success: 'text-success-text',
+    warning: 'text-warning-text',
+    danger: 'text-danger-text',
+  };
+  const iconTone: Record<typeof tone, string> = {
+    neutral: 'bg-surface-sunken text-text-secondary',
+    success: 'bg-success-soft text-success',
+    warning: 'bg-warning-soft text-warning',
+    danger: 'bg-danger-soft text-danger',
+  };
   return (
-    <div className="rounded border border-gray-200 bg-white p-3">
-      <div className="text-xs uppercase text-gray-500">{label}</div>
-      <div data-cy={cy} className="my-1 text-2xl font-semibold">
-        {value}
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wider text-text-tertiary">{label}</div>
+          <div data-cy={cy} className={`mt-2 text-2xl font-bold tracking-tight ${toneClasses[tone]}`}>{value}</div>
+        </div>
+        {icon && (
+          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconTone[tone]}`}>
+            {icon}
+          </div>
+        )}
       </div>
-    </div>
+    </Card>
   );
 }

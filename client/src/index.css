@@ -1,11 +1,431 @@
 @import "tailwindcss";
 
 /* =============================================================================
+ * Regress — design system
+ *
+ * Tailwind v4 reads tokens from the @theme block below. Anything declared
+ * with `--color-*`, `--font-*`, `--radius-*`, `--shadow-*` is exposed as a
+ * utility class (e.g. `bg-bg`, `text-text-secondary`, `rounded-card`).
+ *
+ * Palette philosophy: warm neutrals (stone) + a single accent (violet/indigo).
+ * Surface is warm off-white, never pure white; borders are low-contrast;
+ * shadows are tinted with the brand hue so they don't look pasted on.
+ * ========================================================================== */
+@theme {
+  --color-bg: #FAFAF9;
+  --color-bg-elevated: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F5F5F4;
+  --color-surface-sunken: #F4F4F5;
+
+  --color-border: #E7E5E4;
+  --color-border-strong: #D6D3D1;
+  --color-border-soft: #F0EFEE;
+
+  --color-text: #1C1917;
+  --color-text-secondary: #57534E;
+  --color-text-tertiary: #A8A29E;
+  --color-text-inverse: #FAFAF9;
+  --color-text-brand: #6D28D9;
+
+  --color-brand: #6D28D9;
+  --color-brand-hover: #5B21B6;
+  --color-brand-soft: #F5F3FF;
+  --color-brand-soft-hover: #EDE9FE;
+  --color-brand-foreground: #FFFFFF;
+
+  --color-accent: #4F46E5;
+  --color-accent-soft: #EEF2FF;
+
+  --color-success: #059669;
+  --color-success-soft: #D1FAE5;
+  --color-success-border: #A7F3D0;
+  --color-success-text: #065F46;
+
+  --color-warning: #D97706;
+  --color-warning-soft: #FEF3C7;
+  --color-warning-border: #FDE68A;
+  --color-warning-text: #92400E;
+
+  --color-danger: #DC2626;
+  --color-danger-soft: #FEE2E2;
+  --color-danger-border: #FECACA;
+  --color-danger-text: #991B1B;
+
+  --color-info: #0284C7;
+  --color-info-soft: #E0F2FE;
+  --color-info-border: #BAE6FD;
+  --color-info-text: #075985;
+
+  /* Result palette — these match the existing data-result / result-* classes
+   * the test suite queries against, so the colour ramp is part of the API. */
+  --color-result-not-run: #6B7280;
+  --color-result-not-run-soft: #F3F4F6;
+  --color-result-passed: #059669;
+  --color-result-passed-soft: #D1FAE5;
+  --color-result-failed: #DC2626;
+  --color-result-failed-soft: #FEE2E2;
+
+  /* Status palette */
+  --color-status-draft: #A16207;
+  --color-status-draft-soft: #FEF3C7;
+  --color-status-active: #1D4ED8;
+  --color-status-active-soft: #DBEAFE;
+  --color-status-deprecated: #6B7280;
+  --color-status-deprecated-soft: #F3F4F6;
+
+  /* Priority palette */
+  --color-priority-high: #DC2626;
+  --color-priority-high-soft: #FEE2E2;
+  --color-priority-medium: #D97706;
+  --color-priority-medium-soft: #FEF3C7;
+  --color-priority-low: #059669;
+  --color-priority-low-soft: #D1FAE5;
+
+  --font-sans: "Inter", "InterVariable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "InterDisplay", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Monaco, Consolas, monospace;
+
+  --radius-card: 0.875rem;
+  --radius-card-lg: 1.125rem;
+  --radius-pill: 9999px;
+
+  --shadow-soft: 0 1px 2px rgb(28 25 23 / 0.04),
+                 0 2px 4px rgb(28 25 23 / 0.04);
+  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.05),
+                 0 1px 3px rgb(28 25 23 / 0.04);
+  --shadow-card-hover: 0 4px 12px rgb(28 25 23 / 0.06),
+                       0 1px 3px rgb(28 25 23 / 0.04);
+  --shadow-pop: 0 10px 30px -10px rgb(28 25 23 / 0.18),
+                0 4px 8px -4px rgb(28 25 23 / 0.08);
+  --shadow-brand: 0 6px 24px -8px rgb(109 40 217 / 0.35),
+                  0 2px 6px -2px rgb(109 40 217 / 0.18);
+}
+
+/* =============================================================================
+ * Base
+ * ========================================================================== */
+@layer base {
+  html, body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    /* Subtle, near-invisible warm wash — the "premium paper" feel. */
+    background-image:
+      radial-gradient(ellipse 1200px 600px at 50% -200px,
+        rgb(109 40 217 / 0.06), transparent 60%),
+      radial-gradient(ellipse 800px 600px at 100% 50%,
+        rgb(79 70 229 / 0.04), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  ::selection {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-hover);
+  }
+
+  /* Refined scrollbar — visible on hover only, never noisy. */
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+  *:hover > ::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(168 162 158 / 0.4);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(168 162 158 / 0.6);
+  }
+
+  /* Refined focus ring — not the default OS blue. */
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+}
+
+/* =============================================================================
+ * Reusable component classes
+ *
+ * Custom utilities for the brand. Each one is small, composable, and named
+ * for what it represents (Card, Pill, EmptyState) rather than what it looks
+ * like (shadow-md, gray-200) so the design system can evolve without breaking
+ * call sites.
+ * ========================================================================== */
+@layer components {
+  .rg-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 150ms ease, border-color 150ms ease;
+  }
+  .rg-card-hover:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--color-border-strong);
+  }
+  .rg-card-feature {
+    background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-bg) 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card-lg);
+    box-shadow: var(--shadow-card);
+  }
+  .rg-card-hero {
+    background: linear-gradient(135deg, var(--color-brand) 0%, #4F46E5 100%);
+    color: var(--color-text-inverse);
+    border-radius: var(--radius-card-lg);
+    box-shadow: var(--shadow-brand);
+    overflow: hidden;
+    position: relative;
+  }
+  .rg-card-hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 100% 0%, rgb(255 255 255 / 0.18), transparent 50%),
+      radial-gradient(circle at 0% 100%, rgb(255 255 255 / 0.10), transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Subtle dotted background for empty/auth areas. */
+  .rg-dot-grid {
+    background-image: radial-gradient(circle, rgb(28 25 23 / 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Pill — used for status / priority / result chips throughout. */
+  .rg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .rg-pill::before {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.6;
+  }
+  .rg-pill-sm { padding: 0 0.5rem; font-size: 0.6875rem; }
+  .rg-pill-lg { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
+
+  .rg-pill-brand { background: var(--color-brand-soft); color: var(--color-brand-hover); }
+  .rg-pill-success { background: var(--color-success-soft); color: var(--color-success-text); }
+  .rg-pill-warning { background: var(--color-warning-soft); color: var(--color-warning-text); }
+  .rg-pill-danger { background: var(--color-danger-soft); color: var(--color-danger-text); }
+  .rg-pill-info { background: var(--color-info-soft); color: var(--color-info-text); }
+  .rg-pill-neutral { background: var(--color-surface-sunken); color: var(--color-text-secondary); }
+
+  .rg-pill-result-passed {
+    background: var(--color-result-passed-soft);
+    color: var(--color-result-passed);
+  }
+  .rg-pill-result-failed {
+    background: var(--color-result-failed-soft);
+    color: var(--color-result-failed);
+  }
+  .rg-pill-result-not_run {
+    background: var(--color-result-not-run-soft);
+    color: var(--color-result-not-run);
+  }
+  .rg-pill-status-draft {
+    background: var(--color-status-draft-soft);
+    color: var(--color-status-draft);
+  }
+  .rg-pill-status-active {
+    background: var(--color-status-active-soft);
+    color: var(--color-status-active);
+  }
+  .rg-pill-status-deprecated {
+    background: var(--color-status-deprecated-soft);
+    color: var(--color-status-deprecated);
+  }
+  .rg-pill-priority-high {
+    background: var(--color-priority-high-soft);
+    color: var(--color-priority-high);
+  }
+  .rg-pill-priority-medium {
+    background: var(--color-priority-medium-soft);
+    color: var(--color-priority-medium);
+  }
+  .rg-pill-priority-low {
+    background: var(--color-priority-low-soft);
+    color: var(--color-priority-low);
+  }
+
+  /* Primary / secondary / ghost / danger buttons. */
+  .rg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 120ms ease;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rg-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .rg-btn-primary {
+    background: var(--color-text);
+    color: var(--color-text-inverse);
+    box-shadow: var(--shadow-soft);
+  }
+  .rg-btn-primary:hover:not(:disabled) {
+    background: #0F0E0D;
+  }
+  .rg-btn-brand {
+    background: var(--color-brand);
+    color: var(--color-brand-foreground);
+    box-shadow: var(--shadow-brand);
+  }
+  .rg-btn-brand:hover:not(:disabled) {
+    background: var(--color-brand-hover);
+  }
+  .rg-btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+  .rg-btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-strong);
+  }
+  .rg-btn-ghost {
+    background: transparent;
+    color: var(--color-text-secondary);
+  }
+  .rg-btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+  .rg-btn-danger {
+    background: var(--color-danger);
+    color: white;
+  }
+  .rg-btn-danger:hover:not(:disabled) {
+    background: #B91C1C;
+  }
+  .rg-btn-sm { padding: 0.3125rem 0.625rem; font-size: 0.8125rem; }
+  .rg-btn-lg { padding: 0.625rem 1.125rem; font-size: 0.9375rem; }
+
+  /* Form input */
+  .rg-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--color-text);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .rg-input::placeholder { color: var(--color-text-tertiary); }
+  .rg-input:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px var(--color-brand-soft);
+  }
+
+  /* Sidebar nav item */
+  .rg-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    transition: all 120ms ease;
+    text-decoration: none;
+  }
+  .rg-nav-item:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+  .rg-nav-item-active {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-hover);
+  }
+  .rg-nav-item-active:hover {
+    background: var(--color-brand-soft-hover);
+    color: var(--color-brand-hover);
+  }
+
+  /* Spinner */
+  .rg-spin {
+    animation: rg-spin 1s linear infinite;
+  }
+  @keyframes rg-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Subtle entrance animation */
+  .rg-fade-in {
+    animation: rg-fade-in 240ms ease-out;
+  }
+  @keyframes rg-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Skeleton shimmer */
+  .rg-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-sunken) 0%,
+      var(--color-border-soft) 50%,
+      var(--color-surface-sunken) 100%
+    );
+    background-size: 200% 100%;
+    animation: rg-skeleton 1.4s ease-in-out infinite;
+    border-radius: 0.375rem;
+  }
+  @keyframes rg-skeleton {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}
+
+/* =============================================================================
  * Vanilla CSS the existing Cypress UI tests rely on. Tailwind doesn't
  * replace these — they were in public/styles.css and the tests query
  * by class name (e.g. `.role-pill.role-admin`).
  * ========================================================================== */
-
 .role-pill {
   display: inline-block;
   padding: 0.125rem 0.5rem;
@@ -15,63 +435,44 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.role-pill.role-admin {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-.role-pill.role-editor {
-  background-color: #dbeafe;
-  color: #1e40af;
-}
-.role-pill.role-viewer {
-  background-color: #e5e7eb;
-  color: #374151;
-}
-.role-pill.role-pending {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-.role-pill.role-accepted {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-.role-pill.role-expired {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
+.role-pill.role-admin { background-color: #FEF3C7; color: #92400E; }
+.role-pill.role-editor { background-color: #DBEAFE; color: #1E40AF; }
+.role-pill.role-viewer { background-color: #E5E7EB; color: #374151; }
+.role-pill.role-pending { background-color: #FEF3C7; color: #92400E; }
+.role-pill.role-accepted { background-color: #D1FAE5; color: #065F46; }
+.role-pill.role-expired { background-color: #FEE2E2; color: #991B1B; }
 
-/* RBAC: viewers can't write. The `data-writable` attribute marks any
- * element that should disappear for viewers. The Shell component
- * applies `role-viewer` to the root element when the logged-in user has
- * the viewer role, so this single rule hides all write surfaces. */
-.role-viewer [data-writable="true"] {
-  display: none !important;
-}
+/* RBAC: viewers can't write. The data-writable attribute marks any element
+ * that should disappear for viewers. The Shell component applies
+ * `role-viewer` to the root element when the logged-in user has the
+ * viewer role, so this single rule hides all write surfaces. */
+.role-viewer [data-writable="true"] { display: none !important; }
 
 /* Match the public/styles.css `.btn.small` look on the admin page
  * select + delete buttons so the existing role-pill + button
  * appearance is consistent. */
-button.btn {
-  cursor: pointer;
-}
+button.btn { cursor: pointer; }
 button.btn.small {
   padding: 0.125rem 0.5rem;
   font-size: 0.75rem;
   border-radius: 0.25rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid #D1D5DB;
   background: white;
 }
-button.btn.small:hover:not(:disabled) {
-  background: #f9fafb;
-}
-button.btn.small.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-}
-button.btn.small.danger:hover:not(:disabled) {
-  background: #fef2f2;
-}
-button.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+button.btn.small:hover:not(:disabled) { background: #F9FAFB; }
+button.btn.small.danger { color: #B91C1C; border-color: #FECACA; }
+button.btn.small.danger:hover:not(:disabled) { background: #FEF2F2; }
+button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Pre-existing result / status / priority classes — the test suite queries
+ * these by name. Keep the colour values in sync with the brand palette
+ * tokens above. */
+.result-not_run, .result-not-run { background: #F3F4F6; color: #374151; }
+.result-passed { background: #D1FAE5; color: #065F46; }
+.result-failed { background: #FEE2E2; color: #991B1B; }
+.status-draft { background: #FEF3C7; color: #92400E; }
+.status-active { background: #DBEAFE; color: #1E40AF; }
+.status-deprecated { background: #F3F4F6; color: #4B5563; }
+.priority-high { background: #FEE2E2; color: #991B1B; }
+.priority-medium { background: #FEF3C7; color: #92400E; }
+.priority-low { background: #D1FAE5; color: #065F46; }

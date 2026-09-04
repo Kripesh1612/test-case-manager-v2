@@ -1,3 +1,4 @@
+// =============================================================================
 // /trash — list soft-deleted cases and suites, with restore + purge.
 //
 // Auth: any logged-in user can VIEW the trash (the server route guards
@@ -9,10 +10,19 @@
 // `{ cases, suites }` shape. Restore / purge mutations invalidate the
 // trash query (and the parent cases / suites query where relevant) so
 // the lists re-render without a manual refetch.
+//
+// All existing data-cy hooks are preserved verbatim so the UI test
+// suite keeps passing without changes.
+// =============================================================================
 
 import { useState } from 'react';
 
+import { Button } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { EmptyState, SkeletonRows } from '@/components/EmptyState';
+import { Icon } from '@/components/Icons';
 import { ConfirmModal } from '@/components/Modal';
+import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
@@ -75,108 +85,147 @@ export function TrashPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Trash</h2>
-          <p className="text-sm text-gray-500">
-            Soft-deleted items. Restore to bring them back, or purge to remove permanently.
-          </p>
-        </div>
-        <span className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-1 text-sm">
-          <span className="text-xs uppercase text-gray-500">Trashed</span>
-          <strong data-cy="trash-total">{total}</strong>
-        </span>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Trash"
+        description="Soft-deleted items are kept here. Restore to bring them back, or purge to remove permanently."
+        actions={
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 shadow-[var(--shadow-soft)]">
+            <Icon.Trash size={14} />
+            <span className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
+              Trashed
+            </span>
+            <strong data-cy="trash-total" className="text-sm font-semibold text-text">
+              {total}
+            </strong>
+          </div>
+        }
+      />
 
-      <div className="mb-6 rounded border border-gray-200 bg-white">
-        <h3 className="border-b border-gray-200 px-4 py-2 text-sm font-semibold">Test Cases</h3>
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border-soft px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-soft text-brand">
+              <Icon.Cases size={14} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-text">Test cases</h3>
+              <p className="text-xs text-text-secondary">
+                {data.cases.length} deleted
+              </p>
+            </div>
+          </div>
+        </div>
+
         {isLoading && data.cases.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-500">Loading…</div>
+          <div className="px-5 py-6">
+            <SkeletonRows rows={3} />
+          </div>
         ) : data.cases.length === 0 ? null : (
-          <table data-cy="trash-cases-table" className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-600">
-              <tr>
-                <th className="px-3 py-2">ID</th>
-                <th className="px-3 py-2">Title</th>
-                <th className="px-3 py-2">Deleted at</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody data-cy="trash-cases-body">
-              {data.cases.map((row) => (
-                <TrashRow
-                  key={row.id}
-                  row={row}
-                  kind="case"
-                  isAdmin={isAdmin}
-                  onRestore={() => handleRestoreCase(row.id)}
-                  onPurge={() =>
-                    setPendingPurge({
-                      kind: 'case',
-                      id: row.id,
-                      label: row.title || '(untitled)',
-                    })
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table data-cy="trash-cases-table" className="w-full text-sm">
+              <thead className="bg-surface-sunken text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">ID</th>
+                  <th className="px-5 py-2.5 font-medium">Title</th>
+                  <th className="px-5 py-2.5 font-medium">Deleted at</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody data-cy="trash-cases-body" className="divide-y divide-border-soft">
+                {data.cases.map((row) => (
+                  <TrashRow
+                    key={row.id}
+                    row={row}
+                    kind="case"
+                    isAdmin={isAdmin}
+                    onRestore={() => handleRestoreCase(row.id)}
+                    onPurge={() =>
+                      setPendingPurge({
+                        kind: 'case',
+                        id: row.id,
+                        label: row.title || '(untitled)',
+                      })
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+
         {/* Empty-state <p> is always rendered (mirrors the vanilla
             trash.html which kept it in the DOM with `hidden` toggled)
             so cy.get('[data-cy="trash-cases-empty"]') stays queryable. */}
-        <p
-          data-cy="trash-cases-empty"
-          hidden={data.cases.length > 0}
-          className="px-4 py-6 text-center text-sm text-gray-500"
-        >
-          No trashed cases.
-        </p>
-      </div>
+        <div data-cy="trash-cases-empty" hidden={data.cases.length > 0}>
+          <EmptyState
+            icon={<Icon.Cases size={20} />}
+            title="No trashed cases"
+            description="Cases you delete will appear here until you restore or purge them."
+          />
+        </div>
+      </Card>
 
-      <div className="rounded border border-gray-200 bg-white">
-        <h3 className="border-b border-gray-200 px-4 py-2 text-sm font-semibold">Test Suites</h3>
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border-soft px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-soft text-brand">
+              <Icon.Suites size={14} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-text">Test suites</h3>
+              <p className="text-xs text-text-secondary">
+                {data.suites.length} deleted
+              </p>
+            </div>
+          </div>
+        </div>
+
         {isLoading && data.suites.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-500">Loading…</div>
+          <div className="px-5 py-6">
+            <SkeletonRows rows={3} />
+          </div>
         ) : data.suites.length === 0 ? null : (
-          <table data-cy="trash-suites-table" className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-600">
-              <tr>
-                <th className="px-3 py-2">ID</th>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Deleted at</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody data-cy="trash-suites-body">
-              {data.suites.map((row) => (
-                <TrashRow
-                  key={row.id}
-                  row={row}
-                  kind="suite"
-                  isAdmin={isAdmin}
-                  onRestore={() => handleRestoreSuite(row.id)}
-                  onPurge={() =>
-                    setPendingPurge({
-                      kind: 'suite',
-                      id: row.id,
-                      label: row.name || '(untitled)',
-                    })
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table data-cy="trash-suites-table" className="w-full text-sm">
+              <thead className="bg-surface-sunken text-left text-xs font-medium uppercase tracking-wider text-text-tertiary">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">ID</th>
+                  <th className="px-5 py-2.5 font-medium">Name</th>
+                  <th className="px-5 py-2.5 font-medium">Deleted at</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody data-cy="trash-suites-body" className="divide-y divide-border-soft">
+                {data.suites.map((row) => (
+                  <TrashRow
+                    key={row.id}
+                    row={row}
+                    kind="suite"
+                    isAdmin={isAdmin}
+                    onRestore={() => handleRestoreSuite(row.id)}
+                    onPurge={() =>
+                      setPendingPurge({
+                        kind: 'suite',
+                        id: row.id,
+                        label: row.name || '(untitled)',
+                      })
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        <p
-          data-cy="trash-suites-empty"
-          hidden={data.suites.length > 0}
-          className="px-4 py-6 text-center text-sm text-gray-500"
-        >
-          No trashed suites.
-        </p>
-      </div>
+        <div data-cy="trash-suites-empty" hidden={data.suites.length > 0}>
+          <EmptyState
+            icon={<Icon.Suites size={20} />}
+            title="No trashed suites"
+            description="Suites you delete will appear here until you restore or purge them."
+          />
+        </div>
+      </Card>
 
       {pendingPurge && (
         <ConfirmModal
@@ -188,7 +237,7 @@ export function TrashPage() {
           onCancel={() => setPendingPurge(null)}
         />
       )}
-    </section>
+    </div>
   );
 }
 
@@ -205,31 +254,36 @@ function TrashRow({ row, kind, isAdmin, onRestore, onPurge }: TrashRowProps) {
     ? (row as TrashedCase).title
     : (row as TrashedSuite).name;
   return (
-    <tr data-cy={`trash-${kind}-row`}>
-      <td className="px-3 py-2">{row.id}</td>
-      <td className="px-3 py-2">{label || '(untitled)'}</td>
-      <td className="px-3 py-2 text-xs text-gray-600">
-        {row.deleted_at ? new Date(row.deleted_at).toLocaleString() : ''}
+    <tr data-cy={`trash-${kind}-row`} className="transition-colors hover:bg-surface-hover">
+      <td className="px-5 py-3 text-xs text-text-tertiary">#{row.id}</td>
+      <td className="px-5 py-3 font-medium text-text">{label || '(untitled)'}</td>
+      <td className="px-5 py-3 text-xs text-text-secondary">
+        {row.deleted_at ? new Date(row.deleted_at).toLocaleString() : '—'}
       </td>
-      <td className="px-3 py-2">
-        <button
-          type="button"
-          data-cy={`trash-${kind}-restore-btn`}
-          onClick={onRestore}
-          className="rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50"
-        >
-          Restore
-        </button>
-        <button
-          type="button"
-          data-cy={`trash-${kind}-purge-btn`}
-          onClick={onPurge}
-          disabled={!isAdmin}
-          title={isAdmin ? 'Permanently delete' : 'Admin only'}
-          className="ml-2 rounded border border-red-300 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Purge
-        </button>
+      <td className="px-5 py-3">
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-cy={`trash-${kind}-restore-btn`}
+            leftIcon={<Icon.Restore size={12} />}
+            onClick={onRestore}
+          >
+            Restore
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            data-cy={`trash-${kind}-purge-btn`}
+            onClick={onPurge}
+            disabled={!isAdmin}
+            title={isAdmin ? 'Permanently delete' : 'Admin only'}
+          >
+            Purge
+          </Button>
+        </div>
       </td>
     </tr>
   );
