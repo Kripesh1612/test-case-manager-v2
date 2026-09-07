@@ -6,14 +6,14 @@
 > execution, flakiness scoring, version history, scheduler, RBAC, audit log,
 > and a 215-test end-to-end suite that documents itself.
 
-[![CI](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Postgres](https://img.shields.io/badge/postgres-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Cypress](https://img.shields.io/badge/cypress-13-17202C?logo=cypress&logoColor=white)](https://www.cypress.io)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+![Tests: 215 passing locally](https://img.shields.io/badge/tests-215_passing_locally-2ea44f)
 
-> **Note:** This is a **v2 rewrite** of [test-case-manager](https://github.com/Kripesh1612/test-case-manager) *(now private)*. The git history in this repo starts fresh on 2026-09-03; the original commits live in the upstream repo linked above.
+> **Note:** The git history in this repo starts fresh — it has been locally pulled into a single-commit repo for review. The original development history is preserved in a private upstream.
 
 ---
 
@@ -165,8 +165,7 @@ too — see [Documentation](#documentation).
 Requires Docker 24+ and Docker Compose v2.
 
 ```bash
-git clone https://github.com/Kripesh1612/test-case-manager-v2
-cd test-case-manager-v2
+cd test-case-manager           # this repo, locally pulled
 
 # First-time only — pull a real JWT_SECRET into your shell so the app
 # stops using the placeholder. (Optional; the default works for local dev.)
@@ -188,8 +187,7 @@ Postgres to pass its healthcheck, applies pending Prisma migrations
 ### Option B — bare metal (Node on host, Postgres in Docker)
 
 ```bash
-git clone https://github.com/Kripesh1612/test-case-manager-v2
-cd test-case-manager-v2
+cd test-case-manager           # this repo, locally pulled
 npm install
 cp .env.example .env                   # set DATABASE_URL + JWT_SECRET
 
