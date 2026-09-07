@@ -21,7 +21,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCron, nextFire, nextFireFromExpr, isValid } = require('./cron');
+const { parseCron, nextFire, nextFireFromExpr, isValid, nextFireInZone, nextFireFromExprInZone } = require('./cron');
 
 // ---- parseCron: token forms -----------------------------------------------
 
@@ -193,4 +193,64 @@ test('isValid: false for invalid expressions (no throw)', () => {
   assert.equal(isValid('not a cron'), false);     // garbage
   assert.equal(isValid('0 0 * *'), false);        // 4 fields
   assert.equal(isValid(''), false);               // empty
+});
+
+// ---- Timezone-aware nextFire --------------------------------------------
+//
+// These tests pin the contract that ScheduledJob.timezone is honored.
+// "0 9 * * *" with timezone="America/New_York" should fire at 09:00
+// New_York time = 13:00 (EDT) or 14:00 (EST) UTC — NOT 09:00 UTC.
+//
+// The CI host's IANA tz database may not have every exotic zone, so
+// we use widely-supported ones (UTC, America/New_York, Asia/Kathmandu).
+
+test('nextFireFromExprInZone: timezone=null falls back to UTC path', () => {
+  // Same input as nextFireFromExpr — identical output by construction.
+  const after = new Date('2026-09-04T12:30:00.500Z');
+  const a = nextFireFromExpr('* * * * *', after);
+  const b = nextFireFromExprInZone('* * * * *', null, after);
+  assert.equal(a.toISOString(), b.toISOString());
+});
+
+test('nextFireFromExprInZone: America/New_York at 09:00 wall = 13:00 UTC (EDT, Sept)', () => {
+  // "30 9 * * *" = 09:30 New_York. From Sept 8 2026 (a Tuesday), Sept
+  // is still EDT (UTC-4). 09:30 EDT = 13:30 UTC.
+  const after = new Date('2026-09-08T00:00:00Z');
+  const next = nextFireFromExprInZone('30 9 * * *', 'America/New_York', after);
+  assert.equal(next.toISOString(), '2026-09-08T13:30:00.000Z');
+});
+
+test('nextFireFromExprInZone: Asia/Kathmandu (UTC+5:45) at 09:00 = 03:15 UTC', () => {
+  // Nepal is UTC+5:45. "0 9 * * *" in Asia/Kathmandu → 03:15 UTC.
+  const after = new Date('2026-09-08T00:00:00Z');
+  const next = nextFireFromExprInZone('0 9 * * *', 'Asia/Kathmandu', after);
+  assert.equal(next.toISOString(), '2026-09-08T03:15:00.000Z');
+});
+
+test('nextFireFromExprInZone: crosses DST correctly (New_York EDT→EST Nov 1 2026)', () => {
+  // Nov 1 2026 is the DST flip in the US (clocks fall back 02:00→01:00).
+  // "0 9 * * *" in America/New_York: on Oct 31 (EDT) fires at 13:00 UTC;
+  // on Nov 1 (EST) fires at 14:00 UTC. We pick "after" so the next
+  // fire lands in EST to verify the offset actually changed.
+  const after = new Date('2026-10-31T15:00:00Z');
+  const next = nextFireFromExprInZone('0 9 * * *', 'America/New_York', after);
+  // Nov 1 09:00 EST = 14:00 UTC.
+  assert.equal(next.toISOString(), '2026-11-01T14:00:00.000Z');
+});
+
+test('nextFireFromExprInZone: unknown timezone throws (not silently UTC)', () => {
+  assert.throws(
+    () => nextFireFromExprInZone('0 9 * * *', 'America/Nwe_York'),
+    /unknown timezone/i,
+  );
+});
+
+test('nextFireInZone: weekday matches are computed in the zone, not UTC', () => {
+  // "0 9 * * 1-5" = 09:00 Mon-Fri in America/New_York.
+  // Saturday 2026-09-05 00:00 UTC is Friday Sep 4 20:00 EDT in New_York.
+  // The next 09:00-in-zone weekday is Monday Sep 7 = 13:00 UTC.
+  const after = new Date('2026-09-05T00:00:00Z');
+  const parsed = parseCron('0 9 * * 1-5');
+  const next = nextFireInZone(parsed, after, 'America/New_York');
+  assert.equal(next.toISOString(), '2026-09-07T13:00:00.000Z');
 });

@@ -15,6 +15,7 @@ const executionRoutes = require('./routes/execution');
 const inviteRoutes = require('./routes/invites');
 const scheduledJobRoutes = require('./routes/scheduledJobs');
 const { startScheduler, stopScheduler } = require('./middleware/schedulerLoop');
+const { startTrashPurge, stopTrashPurge } = require('./utils/trashPurge');
 
 // Path to the Vite production build, when present (used to serve the
 // React app at /cases — see the page-handler section below).
@@ -23,7 +24,16 @@ const clientDistDir = path.join(__dirname, 'client', 'dist');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(express.json());
+// Trust the first proxy hop so client IPs (used by the rate limiter
+// and the audit log) reflect the real caller when running behind
+// nginx / Coolify / another reverse proxy. `1` = trust the nearest
+// proxy; bump via TRUST_PROXY env if you put more hops in front.
+app.set('trust proxy', parseInt(process.env.TRUST_PROXY ?? '1', 10) || 1);
+
+// Bound JSON bodies. 1 MB is generous for our payloads (largest is a
+// case with long description + many steps) and rejects the obvious
+// OOM attempts. Override via JSON_BODY_LIMIT env if you need to.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
 // Serve the simple UI from /public
 app.use(express.static('public'));
@@ -106,6 +116,9 @@ app.listen(PORT, () => {
   // Start the scheduler loop after the HTTP server is accepting so the
   // first tick doesn't block boot.
   startScheduler();
+  // Hourly sweep that hard-deletes soft-deleted rows past their
+  // TRASH_RETENTION_DAYS window. Disabled by TRASH_RETENTION_DAYS=0.
+  startTrashPurge();
 });
 
 // Graceful shutdown — clear the tick interval and let in-flight
@@ -114,6 +127,7 @@ app.listen(PORT, () => {
 const shutdown = (signal) => {
   console.log(`\nReceived ${signal}, shutting down...`);
   stopScheduler();
+  stopTrashPurge();
   process.exit(0);
 };
 process.on('SIGINT', () => shutdown('SIGINT'));

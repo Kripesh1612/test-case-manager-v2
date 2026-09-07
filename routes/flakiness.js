@@ -11,7 +11,6 @@
 const express = require('express');
 const prisma = require('../db');
 
-const withAudit = require('../middleware/withAudit');
 const requireAuth = require('../middleware/auth');
 const { findFlakyCases, analyzeFlakinessForCase } = require('../utils/flakiness');
 
