@@ -10,3 +10,6 @@ node_modules/
 
 # Cypress transient download artifacts
 /cypress/downloads/
+
+# c8 coverage output (run npm run test:coverage to regenerate)
+/coverage/

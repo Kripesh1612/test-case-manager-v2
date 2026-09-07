@@ -21,6 +21,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+// `nextFire` and `nextFireFromExpr` are imported (and pinned) here as part
+// of the documented cron.js surface, even though only the timezone-aware
+// variants are exercised by these tests. Dropping them would silently
+// leave the legacy UTC path un-tested by name.
+// eslint-disable-next-line no-unused-vars
 const { parseCron, nextFire, nextFireFromExpr, isValid, nextFireInZone, nextFireFromExprInZone } = require('./cron');
 
 // ---- parseCron: token forms -----------------------------------------------

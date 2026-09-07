@@ -62,6 +62,10 @@ const requireOwnership = ({ model, idParam = 'id' } = {}) => {
       if (!row) return res.status(404).json({ error: 'Not found' });
 
       const userId = req.user?.id;
+      // `== null` (not `=== null`) on purpose: matches both null AND
+      // undefined. `created_by_id` is set by the route handler, but a
+      // legacy row that bypassed it can have undefined/null both.
+      // eslint-disable-next-line eqeqeq
       if (row.created_by_id == null) {
         // Legacy or server-seeded row — treat as "no recorded owner".
         // Editors can't mutate it; only admins (handled above) can.

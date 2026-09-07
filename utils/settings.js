@@ -15,7 +15,6 @@ const DEFAULT_JWT_SECRET = 'dev-secret-change-me';
 const DEFAULT_INVITE_TTL_DAYS = 7;
 const DEFAULT_TRASH_RETENTION_DAYS = 30;
 const VALID_REGISTRATION_MODES = ['open', 'invite'];
-const VALID_AUDIT_MODES = ['true', 'false'];
 
 // --- JWT ---
 
