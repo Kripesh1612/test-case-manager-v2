@@ -23,7 +23,7 @@
     "cy:run": "cypress run",
     "cy:run:api": "cypress run --spec 'cypress/e2e/api/**/*.cy.js'",
     "cy:run:ui": "cypress run --spec 'cypress/e2e/ui/**/*.cy.js'",
-    "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js utils/executor.test.js",
+    "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js utils/executor.test.js middleware/registrationGate.test.js",
     "test": "cypress run"
   },
   "keywords": [

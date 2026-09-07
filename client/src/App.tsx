@@ -11,6 +11,7 @@
 // =============================================================================
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { PropsWithChildren } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppShell } from '@/components/AppShell';
@@ -28,6 +29,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { SuiteListPage } from '@/features/suites/SuiteListPage';
 import { SuiteDetailPage } from '@/features/suites/SuiteDetailPage';
 import { SchedulerPage } from '@/features/scheduler/SchedulerPage';
+import { AuditLogPage } from '@/features/audit/AuditLogPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -60,6 +62,7 @@ function App() {
               <Route path="/suites/:id" element={<SuiteDetailPage />} />
               <Route path="/scheduler" element={<SchedulerPage />} />
               <Route path="/admin" element={<AdminRoute />} />
+              <Route path="/admin/audit" element={<AdminRoute><AuditLogPage /></AdminRoute>} />
               <Route path="/trash" element={<TrashPage />} />
             </Route>
           </Route>
@@ -72,7 +75,7 @@ function App() {
   );
 }
 
-function AdminRoute() {
+function AdminRoute({ children }: PropsWithChildren) {
   const { user } = useAuth();
   // Non-admins get redirected to the dashboard. The Cypress RBAC test
   // asserts that the admin tab is hidden for non-admins, and any user
@@ -80,7 +83,7 @@ function AdminRoute() {
   if (user && user.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
-  return <AdminPage />;
+  return <>{children ?? <AdminPage />}</>;
 }
 
 export default App;

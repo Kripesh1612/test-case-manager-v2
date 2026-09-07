@@ -92,6 +92,7 @@ app.get('/dashboard', serveReact);
 app.get('/suites', serveReact);
 app.get('/suites/:id', serveReact);
 app.get('/scheduler', serveReact);
+app.get('/admin/audit', serveReact);
 
 // API router — mounted AFTER the HTML page so it owns all the
 // /trash/cases, /trash/suites, etc. sub-paths but the bare /trash

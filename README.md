@@ -311,7 +311,7 @@ curriculum is in [`docs/learning-path.md`](./docs/learning-path.md).
 
 - [`docs/architecture.md`](./docs/architecture.md) — how the eight mechanisms compose
 - [`docs/audit-log.md`](./docs/audit-log.md) — `middleware/withAudit.js`
-- [`docs/soft-delete.md`](./docs/soft-delete.md) — `middleware/softDelete.js` + `deleted_at`
+- [`docs/soft-delete.md`](./docs/soft-delete.md) — `utils/scope.js` (NOT_DELETED/ONLY_DELETED) + `deleted_at`
 - [`docs/case-versions.md`](./docs/case-versions.md) — `utils/snapshot.js` + `utils/diff.js`
 - [`docs/test-runs.md`](./docs/test-runs.md) — `routes/runs.js`
 - [`docs/flakiness.md`](./docs/flakiness.md) — `utils/flakiness.js`

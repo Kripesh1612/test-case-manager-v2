@@ -32,8 +32,14 @@ model TestCase {
 ### Reads filter on `deleted_at: null`
 
 Every `findMany`/`findUnique` call in `routes/testCases.js` and
-`routes/testSuites.js` includes `where: { deleted_at: null }`. The
-helper at `middleware/softDelete.js` exists so this clause is consistent.
+`routes/testSuites.js` includes `where: NOT_DELETED` (defined in
+`utils/scope.js`). The two helpers — `NOT_DELETED` (= `deleted_at: null`)
+for live rows and `ONLY_DELETED` (= `deleted_at: { not: null }`) for
+trash queries — are spread across call sites so the intent is
+greppable. We deliberately don't use a Prisma `$extends` interceptor:
+the trash routes need to bypass the filter, which forces an escape
+hatch and turns every query into "which client am I on?". Inline
+clauses stay readable.
 
 ### Writes set `deleted_at`
 
