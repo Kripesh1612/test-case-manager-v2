@@ -31,7 +31,7 @@ file in the codebase:
 - [`audit-log.md`](./audit-log.md) — actor / action / target timeline;
   `middleware/withAudit.js`.
 - [`soft-delete.md`](./soft-delete.md) — recoverable deletes via
-  `deleted_at` tombstone; `middleware/softDelete.js`.
+  `deleted_at` tombstone; `utils/scope.js#NOT_DELETED`.
 - [`case-versions.md`](./case-versions.md) — append-only version history,
   Myers diff, restore-as-version; `utils/snapshot.js` + `utils/diff.js`.
 - [`test-runs.md`](./test-runs.md) — per-case runtime history;

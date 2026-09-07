@@ -52,6 +52,9 @@ services:
       INVITE_TTL_DAYS: ${INVITE_TTL_DAYS:-7}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       AUDIT_ENABLED: ${AUDIT_ENABLED:-true}
+      # Trust the first reverse-proxy hop. If you put another proxy in
+      # front (e.g. Cloudflare), bump this to match the hop count.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
     ports:
       - "3001:3001"
 

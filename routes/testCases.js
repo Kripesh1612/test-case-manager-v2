@@ -2,6 +2,7 @@ const express = require('express');
 const { validate, asyncHandler } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
+const requireOwnership = require('../middleware/requireOwnership');
 const withAudit = require('../middleware/withAudit');
 const { testCaseSchema, testCaseUpdateSchema } = require('../shared/schemas/testCase');
 const { serializeTestCase } = require('../utils/serialize');
@@ -36,6 +37,10 @@ router.post(
         // defaulting to null here makes the contract explicit when the
         // client omits the field entirely.
         executable_snippet: executable_snippet ?? null,
+        // Tag the row with its creator so requireOwnership can enforce
+        // "editors can only modify what they created" on PUT/DELETE.
+        // NULL is reserved for server-side seeds.
+        created_by_id: Number.isInteger(req.user?.id) ? req.user.id : null,
       },
     });
     // Snapshot v1 — the initial state. created_by_id is the actor who
@@ -72,11 +77,12 @@ router.get(
   })
 );
 
-// UPDATE — PUT /test-cases/:id (editor + admin)
+// UPDATE — PUT /test-cases/:id (editor + admin; ownership enforced)
 router.put(
   '/:id',
   requireAuth,
   requireRole('admin', 'editor'),
+  requireOwnership({ model: 'testCase' }),
   validate(testCaseUpdateSchema),
   withAudit('test_case.update', async (req, res) => {
     const id = parseId(req.params.id);
@@ -139,11 +145,12 @@ router.put(
   })
 );
 
-// DELETE — DELETE /test-cases/:id (editor + admin) — soft delete
+// DELETE — DELETE /test-cases/:id (editor + admin; ownership enforced) — soft delete
 router.delete(
   '/:id',
   requireAuth,
   requireRole('admin', 'editor'),
+  requireOwnership({ model: 'testCase' }),
   withAudit('test_case.delete', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Test case not found' });

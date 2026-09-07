@@ -129,4 +129,89 @@ describe('API: /test-cases/*', () => {
       });
     });
   });
+
+  describe('editor ownership enforcement (middleware/requireOwnership)', () => {
+    let adminToken;
+    let otherEditorToken;
+
+    before(() => {
+      // Pull an admin token and create a second editor so we can prove
+      // editor-A cannot mutate editor-B's resources.
+      return cy.loginAsAdmin().then(({ token }) => {
+        adminToken = token;
+        return cy.register({ name: 'Owner-B Editor' });
+      }).then(({ token }) => {
+        otherEditorToken = token;
+      });
+    });
+
+    it('PUT /test-cases/:id from a different editor → 403', () => {
+      cy.createTestCase(editor.token, { title: `owned-${Date.now()}` }).then((c) => {
+        cy.request({
+          method: 'PUT',
+          url: `/test-cases/${c.id}`,
+          headers: { Authorization: `Bearer ${otherEditorToken}` },
+          body: { title: 'hijack attempt' },
+          failOnStatusCode: false,
+        }).then((resp) => {
+          expect(resp.status, 'non-owner editor blocked').to.eq(403);
+          // Original title preserved.
+          cy.request({
+            url: `/test-cases/${c.id}`,
+            headers: { Authorization: `Bearer ${editor.token}` },
+          }).then((r) => {
+            expect(r.body.title).to.not.eq('hijack attempt');
+          });
+        });
+      });
+    });
+
+    it('DELETE /test-cases/:id from a different editor → 403', () => {
+      cy.createTestCase(editor.token, { title: `owned-del-${Date.now()}` }).then((c) => {
+        cy.request({
+          method: 'DELETE',
+          url: `/test-cases/${c.id}`,
+          headers: { Authorization: `Bearer ${otherEditorToken}` },
+          failOnStatusCode: false,
+        }).then((resp) => {
+          expect(resp.status, 'non-owner editor blocked').to.eq(403);
+          // Row still alive.
+          cy.request({
+            url: `/test-cases/${c.id}`,
+            headers: { Authorization: `Bearer ${editor.token}` },
+          }).then((r) => {
+            expect(r.status).to.eq(200);
+          });
+        });
+      });
+    });
+
+    it('PUT /test-cases/:id by the owning editor → 200', () => {
+      cy.createTestCase(editor.token, { title: `own-update-${Date.now()}` }).then((c) => {
+        cy.request({
+          method: 'PUT',
+          url: `/test-cases/${c.id}`,
+          headers: { Authorization: `Bearer ${editor.token}` },
+          body: { title: 'updated by owner' },
+        }).then((resp) => {
+          expect(resp.status).to.eq(200);
+          expect(resp.body.title).to.eq('updated by owner');
+        });
+      });
+    });
+
+    it('PUT /test-cases/:id by an admin bypasses ownership → 200', () => {
+      cy.createTestCase(editor.token, { title: `admin-override-${Date.now()}` }).then((c) => {
+        cy.request({
+          method: 'PUT',
+          url: `/test-cases/${c.id}`,
+          headers: { Authorization: `Bearer ${adminToken}` },
+          body: { title: 'admin override' },
+        }).then((resp) => {
+          expect(resp.status).to.eq(200);
+          expect(resp.body.title).to.eq('admin override');
+        });
+      });
+    });
+  });
 });

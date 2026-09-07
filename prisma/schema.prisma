@@ -28,6 +28,11 @@ model TestCase {
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
   deleted_at        DateTime? // soft-delete tombstone; NULL = live
+  // Editor ownership: NULL means "no recorded creator" (legacy rows or
+  // server-side seeds). PUT/DELETE require req.user.id === created_by_id
+  // unless the caller is an admin. See middleware/requireOwnership.js.
+  created_by_id     Int?
+  created_by        User?     @relation("CreatedTestCases", fields: [created_by_id], references: [id], onDelete: SetNull)
 
   suites TestSuiteCase[]
   runs   TestRun[]
@@ -101,6 +106,7 @@ model User {
   runs            TestRun[]    @relation("RunsPerformed")
   audit_actor     AuditEvent[] @relation("AuditActor")
   scheduled_jobs  ScheduledJob[] @relation("CreatedScheduledJobs")
+  test_cases      TestCase[]   @relation("CreatedTestCases")
 
   @@map("users")
 }
