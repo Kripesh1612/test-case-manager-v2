@@ -88,7 +88,7 @@ order:
 | 9 | `ui/05-admin.cy.js`        | Admin-only page gating, role promotion      |
 | 10 | `ui/06-advanced-patterns.cy.js` | `cy.intercept()` + `cy.fixture()` — mocking |
 
-Don't run all 211 tests in one go the first time. Run them one spec at a
+Don't run all 215 tests in one go the first time. Run them one spec at a
 time. Watch the Cypress UI. Read the source while the test is open.
 
 ## 4. Read the patterns
