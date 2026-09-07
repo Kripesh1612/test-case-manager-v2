@@ -10,7 +10,11 @@ const validate = (schema) => (req, res, next) => {
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-// Central error handler — translates known errors into consistent JSON shapes
+// Central error handler — translates known errors into consistent JSON shapes.
+// `next` is required by Express's 4-arg signature convention even though we
+// don't call it here — without it, Express doesn't recognize this as the
+// error-handling middleware.
+// eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
   if (err instanceof ZodError) {
     return res.status(400).json({

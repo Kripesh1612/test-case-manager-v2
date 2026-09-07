@@ -24,6 +24,9 @@
     "cy:run:api": "cypress run --spec 'cypress/e2e/api/**/*.cy.js'",
     "cy:run:ui": "cypress run --spec 'cypress/e2e/ui/**/*.cy.js'",
     "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js utils/executor.test.js middleware/registrationGate.test.js",
+    "test:coverage": "c8 --reporter=text --reporter=lcov --include='utils/**/*.js' --include='middleware/**/*.js' --exclude='**/*.test.js' npm run test:unit",
+    "lint": "eslint utils middleware",
+    "lint:fix": "eslint --fix utils middleware",
     "test": "cypress run"
   },
   "keywords": [
@@ -42,7 +45,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "c8": "^10.1.3",
     "cypress": "^13.17.0",
+    "eslint": "^9.39.4",
     "prisma": "^5.22.0"
   }
 }

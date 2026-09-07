@@ -16,7 +16,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const { caseResultFromRunStatus, _buildCypressArgs } = require('./executor');
 
@@ -51,7 +50,7 @@ test('caseResultFromRunStatus: only "passed" and "failed" produce pill updates',
   // null). Guards against future enum widening accidentally mapping a
   // non-verdict status onto the case pill.
   const cases = ['passed', 'failed', 'errored', 'running', 'not_run', 'queued', '', null, undefined];
-  const truthy = cases.filter((s) => caseResultFromRunStatus(s) != null);
+  const truthy = cases.filter((s) => caseResultFromRunStatus(s) !== null && caseResultFromRunStatus(s) !== undefined);
   assert.deepEqual(truthy.sort(), ['failed', 'passed']);
 });
 

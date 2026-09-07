@@ -238,7 +238,7 @@ async function findFlakyCases(threshold = 50) {
   const reports = [];
   for (const c of cases) {
     const r = await analyzeFlakinessForCase(c.id);
-    if (r.score != null && r.score >= threshold) {
+    if (r.score !== null && r.score !== undefined && r.score >= threshold) {
       reports.push({
         case_id: r.case_id,
         score: r.score,
