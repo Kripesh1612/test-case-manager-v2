@@ -4,8 +4,13 @@
 // GET /test-cases/:id/flakiness. `flakinessSummary` is the slim
 // version embedded in case-list responses and used by the
 // GET /test-cases/flaky dashboard endpoint.
+//
+// ESM-shaped so it matches the convention in shared/schemas/* (vite
+// imports them natively; Node 22's CJS named-exports auto-detection
+// makes require('./flakiness').flakinessReportSchema work for the
+// server without a build step).
 
-const { z } = require('zod');
+import { z } from 'zod';
 
 export const FLAKINESS_VERDICTS = [
   'stable',

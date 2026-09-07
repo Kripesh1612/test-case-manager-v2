@@ -2,10 +2,10 @@
 // Unit tests for utils/executor.js — the narrow surface that doesn't need
 // the Postgres/Cypress harness to verify.
 //
-// We test the pure `caseResultFromRunStatus` mapping only. The full
-// executeCase() flow is exercised end-to-end by the Cypress API/UI tests;
-// here we pin the contract between run-status and case-result so a future
-// refactor of `finalize()` can't silently regress it.
+// We test the pure `caseResultFromRunStatus` mapping and the canonical
+// Cypress argv shape. The full executeCase() flow is exercised
+// end-to-end by the Cypress API/UI tests; here we pin the contracts so
+// a future refactor can't silently regress them.
 //
 // Run: npm run test:unit
 // =============================================================================
@@ -14,6 +14,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const { caseResultFromRunStatus, _buildCypressArgs } = require('./executor');
 
@@ -76,3 +79,32 @@ test('_buildCypressArgs: emits the canonical 7-arg invocation', () => {
 function expectProjectRoot() {
   return require('path').resolve(__dirname, '..');
 }
+
+// ---- error/exit race guard (regression) ----------------------------------
+//
+// Node emits `child.on('error')` BEFORE `child.on('exit')` when the
+// spawn itself fails (ENOENT, EACCES, ...) — and `exit` always fires
+// after `error` once the child actually terminates. Without a guard,
+// `finalize()` would run twice: once stamping 'errored' and again
+// with whatever exit code came back, silently overwriting the DB row
+// AND emitting a second 'done' SSE event that flickers the UI.
+//
+// We pin the guard here by asserting the source contains it twice
+// (once in `finishWithError`, once at the top of the exit handler).
+// Mocking child_process.spawn to drive the race from inside a test
+// would be ideal, but CJS doesn't expose node:test's `mock.module`,
+// and a source-level check is the most stable regression guard.
+test('executor: has a finished-flag guard in both error and exit paths (race regression)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, 'executor.js'),
+    'utf8',
+  );
+  // Match `if (finished) return;` literally. Two hits → guard present
+  // in both `finishWithError` and the `child.on('exit')` handler.
+  const matches = src.match(/if \(finished\) return;/g) || [];
+  assert.equal(
+    matches.length,
+    2,
+    `expected 2 'if (finished) return;' guards in executor.js, found ${matches.length}`,
+  );
+});

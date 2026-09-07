@@ -27,9 +27,7 @@ const prisma = require('../db');
 const runStream = require('./runStream');
 const {
   artifactDir,
-  artifactPath,
   writeArtifact,
-  removeArtifacts,
 } = require('./artifactStore');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -97,6 +95,16 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
     let stdoutBuf = '';
     let stderrBuf = '';
 
+    // Both 'error' AND 'exit' can fire on the same child — Node emits
+    // 'error' if the spawn itself fails (ENOENT, EACCES, etc.) and
+    // then ALWAYS emits 'exit' once the process actually terminates.
+    // Without a guard, finalize() would run twice: once stamping
+    // 'errored' and again with whatever exit code came back. The
+    // second call would silently overwrite the first DB row AND emit
+    // a second 'done' SSE event, which the UI would render as a
+    // confusing state flicker.
+    let finished = false;
+
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString();
       stdoutBuf += text;
@@ -109,6 +117,8 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
     });
 
     const finishWithError = async (msg) => {
+      if (finished) return;
+      finished = true;
       console.error('[executor] run', runId, 'failed:', msg);
       await finalize('errored', null, 1, msg);
     };
@@ -116,6 +126,9 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
     child.on('error', (err) => { finishWithError(err.message); });
 
     child.on('exit', async (code) => {
+      if (finished) return;
+      finished = true;
+
       // Always remove the generated spec file. result.json is preserved
       // for debugging — it's tiny.
       try { fs.unlinkSync(specPath); } catch (_) {}

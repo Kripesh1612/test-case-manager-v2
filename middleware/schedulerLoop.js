@@ -32,7 +32,7 @@
 // =============================================================================
 
 const prisma = require('../db');
-const { nextFireFromExpr } = require('../utils/cron');
+const { nextFireFromExpr, nextFireFromExprInZone } = require('../utils/cron');
 const { NOT_DELETED } = require('../utils/scope');
 
 // Default tick interval (ms). Configurable via SCHEDULER_TICK_MS env so
@@ -154,7 +154,10 @@ const claimJob = async (job) => {
   // Compute the next fire time AFTER the current claim window. We
   // deliberately advance past `now` so a job that runs at 9:00:00 and
   // took 90 seconds to execute won't immediately re-fire at 9:01:30.
-  const nextRun = nextFireFromExpr(job.cron, now);
+  // If the job has a timezone, honor it; otherwise stay in UTC.
+  const nextRun = job.timezone && job.timezone !== 'UTC'
+    ? nextFireFromExprInZone(job.cron, job.timezone, now)
+    : nextFireFromExpr(job.cron, now);
   if (!nextRun) {
     // The cron expression has become un-evaluable (shouldn't happen —
     // we validate on write). Treat as a failure so the retry policy
@@ -307,7 +310,9 @@ const recomputeAllDue = async () => {
   if (jobs.length === 0) return;
   log('backfilling next_run_at for', jobs.length, 'job(s)');
   for (const j of jobs) {
-    const next = nextFireFromExpr(j.cron, new Date());
+    const next = j.timezone && j.timezone !== 'UTC'
+      ? nextFireFromExprInZone(j.cron, j.timezone, new Date())
+      : nextFireFromExpr(j.cron, new Date());
     if (next) {
       await prisma.scheduledJob.update({ where: { id: j.id }, data: { next_run_at: next } });
     }
