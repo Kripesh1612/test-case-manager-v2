@@ -6,7 +6,7 @@
 //   • Add-cases toolbar (select + Add button)
 //   • Member cases list with cycle-run + remove per row
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ConfirmModal } from '@/components/Modal';
@@ -40,7 +40,22 @@ export function SuiteDetailPage() {
   const updateCaseM = useUpdateCase();
 
   const [pendingAddId, setPendingAddId] = useState<number>(0);
+  const [addSearch, setAddSearch] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
+
+  // Close the picker dropdown on outside click.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onDocDown(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
+  }, [pickerOpen]);
 
   const suite: Suite | undefined = suiteQ.data;
   const allCases: CaseData[] = casesQ.data ?? [];
@@ -66,6 +81,21 @@ export function SuiteDetailPage() {
     return allCases.filter((c) => !have.has(c.id));
   }, [suite, allCases]);
 
+  const filteredCandidates = useMemo(() => {
+    const q = addSearch.trim().toLowerCase();
+    if (!q) return candidates;
+    return candidates.filter((c) => {
+      if (c.title.toLowerCase().includes(q)) return true;
+      if ((c.description ?? '').toLowerCase().includes(q)) return true;
+      if ((c.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  }, [candidates, addSearch]);
+
+  const selectedCandidate = pendingAddId
+    ? candidates.find((c) => c.id === pendingAddId) ?? null
+    : null;
+
   const cycleResult = (cur: CaseData['result']): CaseData['result'] =>
     cur === 'not_run' ? 'passed' : cur === 'passed' ? 'failed' : 'not_run';
 
@@ -85,6 +115,8 @@ export function SuiteDetailPage() {
         input: { test_case_ids: [...suite.test_case_ids, pendingAddId] },
       });
       setPendingAddId(0);
+      setAddSearch('');
+      setPickerOpen(false);
       showToast({ message: 'Added to suite', variant: 'success' });
     } catch (err) {
       showToast({ message: (err as Error).message ?? 'Failed', variant: 'error' });
@@ -184,28 +216,77 @@ export function SuiteDetailPage() {
       {/* Add-cases toolbar */}
       <Card className="p-4">
         <div data-cy="add-cases-toolbar" className="flex flex-wrap items-center gap-2">
-          <label htmlFor="add-case-select" className="text-sm font-medium text-text-secondary">
+          <label htmlFor="add-case-search" className="text-sm font-medium text-text-secondary">
             Add test cases
           </label>
-          <select
-            id="add-case-select"
-            data-cy="add-case-select"
-            value={pendingAddId}
-            onChange={(e) => setPendingAddId(Number(e.target.value))}
-            disabled={!writable}
-            className="rg-input flex-1 min-w-[200px]"
-          >
-            <option value={0}>— pick a test case —</option>
-            {candidates.length === 0 ? (
-              <option value={0} disabled>— no more test cases to add —</option>
-            ) : (
-              candidates.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))
+          <div ref={pickerRef} className="relative flex-1 min-w-[240px]">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary">
+              <Icon.Search size={14} />
+            </span>
+            <input
+              id="add-case-search"
+              data-cy="add-case-search"
+              type="search"
+              autoComplete="off"
+              placeholder={
+                candidates.length === 0
+                  ? 'No more test cases to add'
+                  : 'Type to search…'
+              }
+              disabled={!writable || candidates.length === 0}
+              value={selectedCandidate ? selectedCandidate.title : addSearch}
+              onFocus={() => setPickerOpen(true)}
+              onChange={(e) => {
+                setPendingAddId(0);
+                setAddSearch(e.target.value);
+                setPickerOpen(true);
+              }}
+              className="rg-input pl-9"
+            />
+            {pickerOpen && candidates.length > 0 && (
+              <ul
+                data-cy="add-case-options"
+                className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-card"
+              >
+                {filteredCandidates.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-text-secondary">
+                    No test cases match “{addSearch}”.
+                  </li>
+                ) : (
+                  filteredCandidates.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        data-cy="add-case-option"
+                        data-id={c.id}
+                        onClick={() => {
+                          setPendingAddId(c.id);
+                          setAddSearch('');
+                          setPickerOpen(false);
+                        }}
+                        className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-surface-hover ${
+                          pendingAddId === c.id ? 'bg-brand-soft' : ''
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium text-text">{c.title}</div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-text-tertiary">
+                            <StatusPill status={c.status ?? 'draft'} size="sm" />
+                            <PriorityPill priority={c.priority ?? 'medium'} size="sm" />
+                            {(c.tags ?? []).slice(0, 3).map((t) => (
+                              <Pill key={t} tone="brand" size="sm" className="!py-0">
+                                #{t}
+                              </Pill>
+                            ))}
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
             )}
-          </select>
+          </div>
           <Button
             variant="secondary"
             data-cy="add-case-btn"
