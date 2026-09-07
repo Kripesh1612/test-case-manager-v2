@@ -23,6 +23,7 @@
     "cy:run": "cypress run",
     "cy:run:api": "cypress run --spec 'cypress/e2e/api/**/*.cy.js'",
     "cy:run:ui": "cypress run --spec 'cypress/e2e/ui/**/*.cy.js'",
+    "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js",
     "test": "cypress run"
   },
   "keywords": [
