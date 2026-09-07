@@ -187,6 +187,36 @@ describe('UI: /cases/:id case detail + versions', () => {
     });
   });
 
+  it('opens the inline edit modal in place when Edit is clicked (no nav away)', () => {
+    setupCaseWithTwoVersions().then(({ caseId }) => {
+      cy.visit(`/cases/${caseId}`);
+      cy.url().should('include', `/cases/${caseId}`);
+      cy.get('[data-cy="case-edit-btn"]').click();
+      // Stay on the detail page and the modal appears.
+      cy.url().should('include', `/cases/${caseId}`);
+      cy.get('[data-cy="case-edit-modal"]').should('be.visible');
+      cy.get('[data-cy="case-form"]').should('be.visible');
+      // Cancel closes it without leaving the page.
+      cy.get('[data-cy="case-cancel-btn"]').click();
+      cy.get('[data-cy="case-edit-modal"]').should('not.exist');
+      cy.url().should('include', `/cases/${caseId}`);
+    });
+  });
+
+  it('cycles the run result from the detail page header', () => {
+    setupCaseWithTwoVersions().then(({ caseId }) => {
+      cy.visit(`/cases/${caseId}`);
+      cy.get('[data-cy="case-detail-run-btn"]')
+        .should('have.class', 'result-not_run')
+        .click()
+        .should('have.class', 'result-passed')
+        .click()
+        .should('have.class', 'result-failed')
+        .click()
+        .should('have.class', 'result-not_run');
+    });
+  });
+
   it('renders a "not found" panel for a non-existent case id', () => {
     cy.setAuthInBrowser(admin.user, admin.token).then(() => {
       cy.visit('/cases/9999999');
