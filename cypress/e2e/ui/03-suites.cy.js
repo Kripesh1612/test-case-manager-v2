@@ -109,11 +109,29 @@ describe('UI: Suite detail page', () => {
     cy.get('[data-cy="stat-suite-notrun"]').should('have.text', '1');
   });
 
-  it('adds a case to the suite via the toolbar', () => {
-    cy.get('[data-cy="add-case-select"]').select(caseIds[1].toString());
+  it('adds a case to the suite via the searchable picker', () => {
+    // Type to filter, click the matching option, then Add.
+    cy.get('[data-cy="add-case-search"]').click();
+    cy.get('[data-cy="add-case-options"]').should('be.visible');
+    cy.get('[data-cy="add-case-options"] [data-cy="add-case-option"]').should(
+      'have.length.at.least',
+      1,
+    );
+    // Filter by a substring that uniquely identifies "Detail B" (which is
+    // the case NOT already in the suite, so it's a candidate).
+    cy.get('[data-cy="add-case-search"]').type('Detail B');
+    cy.get('[data-cy="add-case-options"] [data-cy="add-case-option"]')
+      .should('have.length', 1)
+      .click();
     cy.get('[data-cy="add-case-btn"]').click();
     cy.get('[data-cy="toast"][data-cy-toast="success"]').should('contain', 'Added');
     cy.get('[data-cy="stat-suite-case-count"]').should('have.text', '2');
+  });
+
+  it('shows a "no matches" message when the search has no results', () => {
+    cy.get('[data-cy="add-case-search"]').click();
+    cy.get('[data-cy="add-case-search"]').type('zzz-no-such-case');
+    cy.get('[data-cy="add-case-options"]').should('contain', 'No test cases match');
   });
 
   it('removes a case via the × button (with confirmation)', () => {
