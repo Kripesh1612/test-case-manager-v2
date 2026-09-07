@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ConfirmModal } from '@/components/Modal';
-import { Pill, StatusPill, PriorityPill } from '@/components/Pill';
+import { Pill, ResultPill, StatusPill, PriorityPill } from '@/components/Pill';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icons';
@@ -22,9 +22,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
 
 import { CaseDiffView } from './CaseDiffView';
+import { CaseForm } from './CaseForm';
 import { FlakinessPanel } from './FlakinessComponents';
 import { RunPanel } from './RunPanel';
-import { useCase, useCaseDiff, useRestoreVersion, useVersion, useVersions } from './hooks';
+import type { CaseUpdateInput } from './api';
+import { useCase, useCaseDiff, useRestoreVersion, useUpdateCase, useVersion, useVersions } from './hooks';
 
 export function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,7 +47,23 @@ export function CaseDetailPage() {
   const diffQ = useCaseDiff(caseId, fromId, toId);
 
   const restoreM = useRestoreVersion(caseId);
+  const updateM = useUpdateCase();
   const [pendingRestore, setPendingRestore] = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  // Deep-link support: ?edit={caseId} opens the inline editor. Keeps
+  // the existing test contract (`href` includes `/cases?edit=`) intact
+  // while also opening the editor in place when navigated from
+  // somewhere with that query string already set.
+  useEffect(() => {
+    if (params.get('edit') != null) {
+      setEditing(true);
+      const next = new URLSearchParams(params);
+      next.delete('edit');
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!versionsQ.data || versionsQ.data.length < 2) return;
@@ -136,6 +154,28 @@ export function CaseDetailPage() {
     }
   }
 
+  function cycleRunResult(current: string) {
+    // Same cycle as the list page: not_run → passed → failed → not_run.
+    const next = current === 'not_run' ? 'passed' : current === 'passed' ? 'failed' : 'not_run';
+    updateM.mutate(
+      { id: caseId, input: { result: next } },
+      {
+        onError: (e) =>
+          showToast({ message: extractError(e, 'Failed to update run status'), variant: 'error' }),
+      },
+    );
+  }
+
+  async function handleUpdate(values: CaseUpdateInput) {
+    try {
+      await updateM.mutateAsync({ id: caseId, input: values });
+      showToast({ message: 'Test case updated', variant: 'success' });
+      setEditing(false);
+    } catch (e) {
+      showToast({ message: extractError(e, 'Failed to update test case'), variant: 'error' });
+    }
+  }
+
   const canRestore = user?.role === 'admin' || user?.role === 'editor';
   const pendingRestoreVersion = pendingRestore != null ? versions.find((v) => v.id === pendingRestore) : null;
 
@@ -188,15 +228,38 @@ export function CaseDetailPage() {
               ))}
             </div>
           </div>
-          <Link
-            to={`/cases?edit=${tc.id}`}
-            data-cy="case-edit-btn"
-            data-writable="true"
-          >
-            <Button variant="secondary" leftIcon={<Icon.Settings size={14} />}>
-              Edit
-            </Button>
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            {user?.role !== 'viewer' && (
+              <button
+                type="button"
+                data-cy="case-detail-run-btn"
+                data-id={tc.id}
+                data-writable="true"
+                title="Click to cycle run result"
+                className={`shrink-0 rounded-md border border-border bg-surface px-2 py-1.5 text-xs font-medium hover:bg-surface-hover result-${tc.result ?? 'not_run'}`}
+                onClick={() => cycleRunResult(tc.result ?? 'not_run')}
+              >
+                <span className="text-text-tertiary mr-1">Run:</span>
+                <ResultPill result={tc.result ?? 'not_run'} size="sm" />
+              </button>
+            )}
+            <Link
+              to={`/cases?edit=${tc.id}`}
+              data-cy="case-edit-btn"
+              data-writable="true"
+              onClick={(e) => {
+                // Stay on the detail page and open the editor in place
+                // instead of bouncing back to the list. The href is
+                // still honored as a deep-link / fallback.
+                e.preventDefault();
+                setEditing(true);
+              }}
+            >
+              <Button variant="secondary" leftIcon={<Icon.Settings size={14} />}>
+                Edit
+              </Button>
+            </Link>
+          </div>
         </div>
       </Card>
 
@@ -361,6 +424,29 @@ export function CaseDetailPage() {
           onConfirm={confirmRestore}
           onCancel={() => setPendingRestore(null)}
         />
+      )}
+
+      {editing && (
+        <div
+          data-cy="case-edit-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEditing(false)}
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl"
+          >
+            <CaseForm
+              initial={tc}
+              knownTags={tc.tags ?? []}
+              submitting={updateM.isPending}
+              onSubmit={(values) => handleUpdate(values as CaseUpdateInput)}
+              onCancel={() => setEditing(false)}
+            />
+          </div>
+        </div>
       )}
     </section>
   );

@@ -66,6 +66,9 @@ export function useUpdateCase() {
       qc.setQueryData<CaseData[]>(CASES_KEY, (old) =>
         old ? old.map((c) => (c.id === updated.id ? updated : c)) : [updated],
       );
+      // Also patch the single-case cache so the detail page updates
+      // immediately after a mutation (e.g. inline edit, mark as pass).
+      qc.setQueryData<CaseData>(caseKey(updated.id), updated);
     },
   });
 }

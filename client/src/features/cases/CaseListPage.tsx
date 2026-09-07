@@ -90,6 +90,24 @@ export function CaseListPage() {
     }
   }, [showForm]);
 
+  // Honor deep-link from the detail page: /cases?edit={id} opens the
+  // inline editor for that case. The detail page normally intercepts
+  // the click and opens the editor in place, but middle-click / new-tab
+  // still lands here.
+  useEffect(() => {
+    const editId = params.get('edit');
+    if (editId == null) return;
+    const target = (casesQ.data ?? []).find((c) => String(c.id) === editId);
+    if (target) {
+      setEditing(target);
+      setShowForm(true);
+      const next = new URLSearchParams(params);
+      next.delete('edit');
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casesQ.data, params.get('edit')]);
+
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(handle);
