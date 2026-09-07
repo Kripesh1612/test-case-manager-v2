@@ -17,6 +17,7 @@
 // as the run's lifecycle, so co-locating them is simpler.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
@@ -50,6 +51,7 @@ export function RunPanel({ caseData }: RunPanelProps) {
   const [savingSnippet, setSavingSnippet] = useState(false);
 
   const executeM = useExecuteCase();
+  const qc = useQueryClient();
   const snippetRef = useRef(snippet);
   snippetRef.current = snippet;
 
@@ -65,6 +67,49 @@ export function RunPanel({ caseData }: RunPanelProps) {
   // Stable handler — re-subscribing to SSE on every render would drop
   // the in-flight events.
   const handleStreamEvent = useCallback((event: string, data: unknown) => {
+    if (event === 'done') {
+      const payload = data as {
+        status: 'passed' | 'failed' | 'errored';
+        assertionCount?: number | null;
+        exitCode?: number | null;
+        errorLog?: string;
+      };
+      setStatus(payload.status);
+      setResult({
+        status: payload.status,
+        assertionCount: payload.assertionCount ?? null,
+        exitCode: payload.exitCode ?? null,
+        errorLog: payload.errorLog,
+      });
+      setActiveRunId(null);
+
+      // Sync the case caches. The executor's finalize path already
+      // wrote the terminal result to the DB (TestCase.result + last_run_at),
+      // so we mirror that here so the pill on the detail header and the
+      // pill on the /cases list both flip without a manual refresh.
+      // 'errored' runs do NOT update result on the case (Cypress crashed
+      // mid-flight, not an assertion verdict), so we skip those.
+      if (payload.status === 'passed' || payload.status === 'failed') {
+        const finishedAt = new Date().toISOString();
+        qc.setQueryData<CaseData>(['cases', caseData.id], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            result: payload.status,
+            last_run_at: finishedAt,
+          };
+        });
+        // Invalidate the list so the pill flips when the user navigates
+        // back to /cases. We patch optimistically above for this page;
+        // the invalidation here just guarantees consistency across views.
+        qc.invalidateQueries({ queryKey: ['cases'] });
+        // Flakiness score derives from the runs table — kick it too.
+        qc.invalidateQueries({ queryKey: ['cases', caseData.id, 'flakiness'] });
+        qc.invalidateQueries({ queryKey: ['flaky-cases'] });
+        qc.invalidateQueries({ queryKey: ['runs', 'recent'] });
+      }
+      return;
+    }
     if (event === 'snapshot' || event === 'progress') {
       // Snapshot: { status: 'running' | ... } or Progress: { phase }
       const payload = data as { status?: UiStatus; phase?: string };
@@ -89,23 +134,6 @@ export function RunPanel({ caseData }: RunPanelProps) {
       });
       return;
     }
-    if (event === 'done') {
-      const payload = data as {
-        status: 'passed' | 'failed' | 'errored';
-        assertionCount?: number | null;
-        exitCode?: number | null;
-        errorLog?: string;
-      };
-      setStatus(payload.status);
-      setResult({
-        status: payload.status,
-        assertionCount: payload.assertionCount ?? null,
-        exitCode: payload.exitCode ?? null,
-        errorLog: payload.errorLog,
-      });
-      setActiveRunId(null);
-      return;
-    }
     if (event === 'error') {
       // Connection-level error — bail to a useful terminal state.
       setStatus('errored');
@@ -119,7 +147,7 @@ export function RunPanel({ caseData }: RunPanelProps) {
       });
       setActiveRunId(null);
     }
-  }, []);
+  }, [qc, caseData.id]);
   useRunStream(activeRunId, handleStreamEvent);
 
   function startRun() {

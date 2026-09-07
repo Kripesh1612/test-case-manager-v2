@@ -185,10 +185,21 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
         });
         // last_run_at should bump on terminal (passed/failed) too, so
         // the dashboard's "recently executed" sort reflects real activity.
-        if (status === 'passed' || status === 'failed') {
+        // And because TestCase.result is the pill the list shows by
+        // default, we mirror the terminal run status onto it here so a
+        // user who clicks Run sees the case's status update without
+        // having to also click the cycle pill. We only sync on terminal
+        // pass/fail — an 'errored' run (Cypress crashed mid-flight)
+        // doesn't reflect a real assertion verdict so we leave the
+        // existing pill alone.
+        const caseResult = caseResultFromRunStatus(status);
+        if (caseResult) {
           await prisma.testCase.update({
             where: { id: caseId },
-            data: { last_run_at: finishedAt },
+            data: {
+              last_run_at: finishedAt,
+              result: caseResult,
+            },
           });
         }
       } catch (dbErr) {
@@ -222,4 +233,20 @@ function _buildCypressArgs(specPath, resultPath) {
   ];
 }
 
-module.exports = { executeCase, _buildCypressArgs, wrapSnippet };
+// Map a terminal Cypress run status onto the `TestCase.result` pill.
+// `'not_run' | 'passed' | 'failed'` per prisma/schema.prisma:24.
+//
+// `'errored'` is intentionally NOT mapped to any pill value — a Cypress
+// crash mid-flight doesn't reflect an assertion verdict, so the
+// existing pill stays put and the run row's `error_log` carries the
+// signal for the UI.
+//
+// `'running'` is also not a terminal state so there's nothing to mirror
+// — we simply leave the existing result alone.
+function caseResultFromRunStatus(status) {
+  if (status === 'passed') return 'passed';
+  if (status === 'failed') return 'failed';
+  return null;
+}
+
+module.exports = { executeCase, _buildCypressArgs, wrapSnippet, caseResultFromRunStatus };
