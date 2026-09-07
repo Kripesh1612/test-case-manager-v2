@@ -113,17 +113,10 @@ describe('UI: Suite detail page', () => {
     // Type to filter, click the matching option, then Add.
     cy.get('[data-cy="add-case-search"]').click();
     cy.get('[data-cy="add-case-options"]').should('be.visible');
-    cy.get('[data-cy="add-case-options"] [data-cy="add-case-option"]').should(
-      'have.length.at.least',
-      1,
-    );
-    // Filter by a substring that uniquely identifies "Detail B" (which is
-    // the case NOT already in the suite, so it's a candidate).
-    cy.get('[data-cy="add-case-search"]').type('Detail B');
-    cy.get('[data-cy="add-case-options"] [data-cy="add-case-option"]')
-      .should('have.length', 1)
-      .click();
-    cy.get('[data-cy="add-case-btn"]').click();
+    // Pick by data-id (caseIds[1] is the second case, NOT in the suite),
+    // so the assertion is robust to leftover rows from earlier specs.
+    cy.get(`[data-cy="add-case-option"][data-id="${caseIds[1]}"]`).click();
+    cy.get('[data-cy="add-case-btn"]').should('not.be.disabled').click();
     cy.get('[data-cy="toast"][data-cy-toast="success"]').should('contain', 'Added');
     cy.get('[data-cy="stat-suite-case-count"]').should('have.text', '2');
   });
