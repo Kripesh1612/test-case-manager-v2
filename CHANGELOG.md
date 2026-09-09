@@ -42,8 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TestCase.result` vs `TestRun.status` decision.
 - Cypress API tests for editor-ownership enforcement (4 cases in
   `cypress/e2e/api/02-test-cases.cy.js`).
+- Generated OpenAPI spec — `npm run openapi` writes `docs/openapi.json`
+  from the shared Zod schemas (`scripts/generate-openapi.mjs`), covering
+  49 operations across 38 paths with a Bearer security scheme.
+- Swagger UI browser — `npm run openapi:serve` serves a zero-install
+  Swagger UI on `:3002` that loads the local spec (see `docs/openapi.md`).
+- `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
 ### Changed
+- README test-count references reconciled again: 292 Cypress (133 API +
+  144 UI + 15 advanced-patterns) + 80 `node:test` unit = 372 total. The
+  static "N passing locally" badge was replaced with a **live GitHub
+  Actions CI badge** so the count can't go stale again.
 - `executor` finalizes a run with a `finished` guard so that the
   `child.on('error')` and `child.on('exit')` handlers cannot both call
   `finalize()` for the same run when the error event is emitted followed

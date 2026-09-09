@@ -49,7 +49,7 @@ GitHub. Each run shows:
 | Setup Node          | ~10s     | Cache hit after first run                        |
 | Install dependencies| ~30s     | Cache hit after first run                        |
 | Apply Prisma migrations | ~5s | No-op after the first run (idempotent)           |
-| Cypress run         | ~2–3 min | 218 tests, full API + UI + advanced patterns     |
+| Cypress run         | ~2–3 min | 292 tests, full API + UI + advanced patterns     |
 | Node unit suite     | < 1 s    | 80 tests (utils/cron.test.js, registrationGate, flakiness, diff, executor) |
 
 If any test fails, the run goes red, the README badge flips to

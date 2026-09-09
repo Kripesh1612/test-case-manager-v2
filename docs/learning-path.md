@@ -88,7 +88,7 @@ order:
 | 9 | `ui/05-admin.cy.js`        | Admin-only page gating, role promotion      |
 | 10 | `ui/06-advanced-patterns.cy.js` | `cy.intercept()` + `cy.fixture()` — mocking |
 
-Don't run all 218 Cypress tests in one go the first time. Run them one spec
+Don't run all 292 Cypress tests in one go the first time. Run them one spec
 at a time. Watch the Cypress UI. Read the source while the test is open.
 
 > The Node `node:test` unit suite (`npm run test:unit`) is separate — 80

@@ -50,6 +50,8 @@ file in the codebase:
   healthchecks, multi-stage build, `wait-for-postgres`.
 - [`ci.md`](./ci.md) — what the GitHub Actions workflow does, and the
   trade-offs it makes (test-count claim, video artifacts, etc.).
+- [`openapi.md`](./openapi.md) — the generated OpenAPI spec + Swagger UI;
+  how it stays in sync with `shared/schemas/`.
 
 ---
 

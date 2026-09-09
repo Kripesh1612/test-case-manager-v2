@@ -27,6 +27,8 @@
     "test:coverage": "c8 --reporter=text --reporter=lcov --include='utils/**/*.js' --include='middleware/**/*.js' --exclude='**/*.test.js' npm run test:unit",
     "lint": "eslint utils middleware",
     "lint:fix": "eslint --fix utils middleware",
+    "openapi": "node scripts/generate-openapi.mjs",
+    "openapi:serve": "node scripts/serve-openapi.mjs",
     "test": "cypress run"
   },
   "keywords": [
@@ -45,6 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "c8": "^10.1.3",
     "cypress": "^13.17.0",
     "eslint": "^9.39.4",
