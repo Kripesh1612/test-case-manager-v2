@@ -45,8 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated OpenAPI spec — `npm run openapi` writes `docs/openapi.json`
   from the shared Zod schemas (`scripts/generate-openapi.mjs`), covering
   49 operations across 38 paths with a Bearer security scheme.
-- Swagger UI browser — `npm run openapi:serve` serves a zero-install
-  Swagger UI on `:3002` that loads the local spec (see `docs/openapi.md`).
+- Swagger UI browser — `npm run openapi:serve` serves a Swagger UI on `:3002`
+  that loads the local spec (see `docs/openapi.md`). UI assets are vendored
+  from `swagger-ui-dist` at `/vendor/*`, so it renders with no internet access.
 - `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
 ### Changed

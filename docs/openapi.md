@@ -24,9 +24,11 @@ npm run openapi          # rewrites docs/openapi.json
 
 ## Browse / try it
 
-`npm run openapi:serve` runs a zero-install Swagger UI on
-`http://localhost:3002` that loads the local spec. With the app running on
-`:3001`, you can click **Authorize**, paste a JWT, and exercise endpoints live:
+`npm run openapi:serve` runs a Swagger UI on `http://localhost:3002` that
+loads the local spec. The UI assets are vendored from `swagger-ui-dist`
+(served at `/vendor/*`), so it renders with **no internet access**. With the
+app running on `:3001`, you can click **Authorize**, paste a JWT, and exercise
+endpoints live:
 
 ```bash
 npm run openapi:serve    # then open http://localhost:3002
