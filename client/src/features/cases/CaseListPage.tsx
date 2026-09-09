@@ -485,7 +485,7 @@ export function CaseListPage() {
               action={
                 <Button
                   variant="primary"
-                  data-cy="case-new-btn"
+                  data-cy="case-empty-new-btn"
                   data-writable="true"
                   leftIcon={<Icon.Plus size={14} />}
                   onClick={() => { setEditing(null); setShowForm(true); }}
@@ -564,7 +564,7 @@ export function CaseListPage() {
 
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span data-cy="case-status">
-                        <StatusPill status={c.status} size="sm" />
+                        <StatusPill status={c.status ?? 'draft'} size="sm" />
                       </span>
                       <span data-cy="case-priority">
                         <PriorityPill priority={c.priority ?? 'medium'} size="sm" />

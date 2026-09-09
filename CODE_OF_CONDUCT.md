@@ -51,9 +51,13 @@ when an individual is officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at the project
-maintainer's contact address. All complaints will be reviewed and investigated
-promptly and fairly.
+reported by opening a private issue in the repository issue tracker
+(https://github.com/Kripesh1612/test-case-manager-v2/issues) or by contacting
+the project maintainer directly. All complaints will be reviewed and
+investigated promptly and fairly.
+
+Community leaders are obligated to respect the privacy and security of the
+reporter of any incident.
 
 ## Attribution
 

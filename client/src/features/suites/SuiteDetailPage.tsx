@@ -327,7 +327,7 @@ export function SuiteDetailPage() {
                       {c.title}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <StatusPill status={c.status} size="sm" />
+                      <StatusPill status={c.status ?? 'draft'} size="sm" />
                       <PriorityPill priority={c.priority ?? 'medium'} size="sm" />
                     </div>
                   </Link>

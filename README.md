@@ -4,7 +4,7 @@
 >
 > A self-contained test management platform: REST API, React UI, real Cypress
 > execution, flakiness scoring, version history, scheduler, RBAC, audit log,
-> and a 372-test suite (292 Cypress + 80 Node `node:test` unit) that
+> and a 298-test suite (218 Cypress + 80 Node `node:test` unit) that
 > documents itself.
 
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -49,8 +49,8 @@ both a usable tool and a learning resource:
 - Every **cross-cutting mechanism** (audit, soft delete, version history,
   flakiness, scheduler, real execution) lives in its own module and its own
   doc, so the codebase reads top-to-bottom.
-- The **test suite doubles as documentation**: 133 API contract tests, 144 UI
-  end-to-end tests, 15 cross-cutting Cypress specs, 80 Node `node:test`
+- The **test suite doubles as documentation**: 129 API contract tests, 83 UI
+  end-to-end tests, 6 cross-cutting Cypress specs, 80 Node `node:test`
   unit tests, plus a Postman collection — together they cover every happy
   path and most of the unhappy ones.
 
@@ -86,7 +86,7 @@ doc is the 5-minute tour.
 
 ### Quality
 
-- **372 tests** total — 292 Cypress (133 API + 144 UI + 15 shared) and 80
+- **298 tests** total — 218 Cypress (129 API + 83 UI + 6 shared) and 80
   Node `node:test` unit cases — all green in CI.
 - **Zod schemas shared** between client and server (single source of truth for input validation).
 - **Strict TypeScript** on the client (no `any` in the feature code).
@@ -150,7 +150,7 @@ the project stays clone-and-run.
 
    ┌────────────────────┐    ┌────────────────────┐
    │  Cypress (CI)      │    │  Cypress (local)   │
-   │  292 Cypress / 80  │    │  cy:open / cy:run  │
+   │  218 Cypress / 80  │    │  cy:open / cy:run  │
    │  node:test unit    │    │                    │
    └────────────────────┘    └────────────────────┘
 ```
@@ -247,13 +247,13 @@ See [`utils/settings.js`](./utils/settings.js) for the canonical list and defaul
 
 ```bash
 npm run cy:open        # interactive Cypress runner
-npm run cy:run         # headless, full Cypress suite (292 tests, ~3 min)
+npm run cy:run         # headless, full Cypress suite (218 tests, ~3 min)
 npm run test:unit      # Node unit suite (80 tests, < 1 s)
-npm run cy:run:api     # 133 API-level contract tests only
-npm run cy:run:ui      # 144 UI-level end-to-end tests only
+npm run cy:run:api     # 129 API-level contract tests only
+npm run cy:run:ui      # 83 UI-level end-to-end tests only
 ```
 
-All 372 tests should be green. If you want to understand them, walk through
+All 298 tests should be green. If you want to understand them, walk through
 [`docs/learning-path.md`](./docs/learning-path.md) for the recommended order,
 or read [`docs/cypress-patterns.md`](./docs/cypress-patterns.md) for a
 catalog of every pattern used.
@@ -380,7 +380,7 @@ Completed across the eight phases of development:
 - [x] Postman collection (with pre-request scripts)
 - [x] Vanilla-JS UI in `public/`
 - [x] RBAC (admin / editor / viewer) — enforced on server *and* UI
-- [x] Cypress — 292 tests across API + UI
+- [x] Cypress — 218 tests across API + UI
 - [x] Advanced Cypress patterns — `cy.intercept()` + `cy.fixture()`
 - [x] Docs that read like a curriculum
 - [x] Docker + env config

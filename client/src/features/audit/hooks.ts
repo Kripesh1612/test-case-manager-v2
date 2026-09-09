@@ -6,7 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import type { AuditFilters, AuditListResponse } from './api';
+import type { AuditFilters } from './api';
 import { fetchAuditActions, fetchAuditEvents } from './api';
 
 const auditKey = (filters: AuditFilters) =>

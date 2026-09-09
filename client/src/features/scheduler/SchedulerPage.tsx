@@ -424,6 +424,17 @@ function JobRow({ job, isAdmin, onRun, onToggle, onDelete, onEdit, onHistory }: 
             type="button"
             variant="ghost"
             size="sm"
+            data-cy="job-edit-btn"
+            data-admin-only
+            hidden={!isAdmin}
+            onClick={onEdit}
+          >
+            <Icon.Edit size={14} />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             data-cy="job-delete-btn"
             data-admin-only
             hidden={!isAdmin}

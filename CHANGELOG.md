@@ -49,12 +49,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that loads the local spec (see `docs/openapi.md`). UI assets are vendored
   from `swagger-ui-dist` at `/vendor/*`, so it renders with no internet access.
 - `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+- `client/src/features/scheduler/SchedulerPage.tsx` — admin "Edit" button on
+  each scheduled-job row (`job-edit-btn`), wiring the create/edit form's
+  existing `isEdit={editingId !== null}` path that had no trigger.
+
+### Fixed
+- Flaky advanced-patterns test "cy.intercept() can ASSERT what the page
+  sent" — `data-cy="case-new-btn"` was duplicated (header create button +
+  empty-state CTA), so `cy.click()` intermittently matched two elements
+  when the mocked empty list rendered the empty-state button in time. Empty
+  state now uses `case-empty-new-btn`; `case-new-btn` is unique again.
+- Client no longer fails `tsc -b` under strict + `noUncheckedIndexedAccess`:
+  removed an unused `AuditListResponse` import, removed the dead `onEdit`
+  prop from the job row wrapper, switched Dashboard pills to the typed
+  `StatusPill`/`PriorityPill`/`ResultPill` wrappers, and added `?? 'draft'`
+  fallbacks where `c.status` is optional.
 
 ### Changed
-- README test-count references reconciled again: 292 Cypress (133 API +
-  144 UI + 15 advanced-patterns) + 80 `node:test` unit = 372 total. The
-  static "N passing locally" badge was replaced with a **live GitHub
-  Actions CI badge** so the count can't go stale again.
+- README test-count references reconciled to the suite total actually
+  measured from a fresh Cypress run: 218 Cypress (129 API + 83 UI + 6
+  advanced-patterns) + 80 `node:test` unit = 298 total. The static
+  "N passing locally" badge was replaced with a **live GitHub Actions CI
+  badge** so the count can't go stale again.
 - `executor` finalizes a run with a `finished` guard so that the
   `child.on('error')` and `child.on('exit')` handlers cannot both call
   `finalize()` for the same run when the error event is emitted followed

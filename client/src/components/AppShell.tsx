@@ -172,8 +172,7 @@ function ProfileMenu({
     };
   }, [open]);
 
-  const initials = email
-    .split('@')[0]
+  const initials = (email.split('@')[0] ?? '')
     .slice(0, 2)
     .toUpperCase();
 

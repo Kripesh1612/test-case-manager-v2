@@ -17,9 +17,8 @@
 import { Link } from 'react-router-dom';
 
 import { Card } from '@/components/Card';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
-import { Pill } from '@/components/Pill';
+import { ResultPill, StatusPill, PriorityPill } from '@/components/Pill';
 import { Spinner } from '@/components/Button';
 import { Icon } from '@/components/Icons';
 
@@ -233,12 +232,8 @@ export function DashboardPage() {
                         {c.title}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <Pill tone={`status-${c.status}` as const} size="sm">
-                          {c.status}
-                        </Pill>
-                        <Pill tone={`priority-${c.priority ?? 'medium'}` as const} size="sm">
-                          {c.priority ?? 'medium'}
-                        </Pill>
+                        <StatusPill status={c.status ?? 'draft'} size="sm" />
+                        <PriorityPill priority={c.priority ?? 'medium'} size="sm" />
                         <span className="text-xs text-text-tertiary">
                           updated {timeAgo(c.updated_at)}
                         </span>
@@ -283,9 +278,7 @@ export function DashboardPage() {
                           {title}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Pill tone={`result-${r.status}` as const} size="sm">
-                            {r.status}
-                          </Pill>
+                          <ResultPill result={r.status} size="sm" />
                           <span className="text-xs text-text-tertiary">
                             by {runner}
                           </span>

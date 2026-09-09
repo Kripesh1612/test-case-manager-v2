@@ -9,10 +9,16 @@ below — they keep the codebase readable top-to-bottom and the suite green.
 
 ```bash
 npm install
-npm run docker:up        # Postgres + app, ready in ~10s
+npm run docker:up        # Postgres + app on :3001 (first build pulls the
+                         # Cypress base image and takes a few minutes;
+                         # afterwards it's a couple of seconds)
 ```
 
 Or the bare-metal path — see the [README](./README.md#quick-start).
+
+The suite is **298 tests**: 218 Cypress (129 API + 83 UI + 6
+advanced-patterns) across `cypress/e2e/`, plus 80 Node `node:test` unit
+cases in `utils/*.test.js` and `middleware/*.test.js`.
 
 ## The four rules
 
@@ -39,18 +45,32 @@ Re-generate the API contract so the docs stay in sync:
 
 ```bash
 npm run openapi          # rewrites docs/openapi.json from shared/schemas
+npm run openapi:serve    # browse/verify it: http://localhost:3002
 ```
 
 ## Running the checks
 
+Run the fast ones first, then the full suite:
+
 ```bash
 npm run lint             # ESLint on utils/ + middleware/
-npm run test:unit        # Node node:test unit suite (fast)
-npm run cy:run           # full Cypress suite (~3 min)
+npm run test:unit        # Node node:test unit suite (80 cases, < 1 s)
+npm run cy:run           # full Cypress suite (218 tests, ~3 min)
 ```
 
-CI runs `npm ci` → `prisma migrate deploy` → the full Cypress suite on every
-push to `main` and every PR. Make sure everything is green locally first.
+CI runs `npm ci` → `prisma migrate deploy` → `npm run lint` →
+`npm run test:unit` → the full Cypress suite on every push to `main` and
+every PR. Make sure everything is green locally first.
+
+## Before you submit
+
+- [ ] `npm run lint` is clean
+- [ ] `npm run test:unit` passes
+- [ ] The full Cypress suite is green locally (not just your new spec)
+- [ ] New/changed endpoints have API tests; new/changed flows have UI tests
+- [ ] New Zod schemas came with a regenerated `docs/openapi.json`
+- [ ] Cross-cutting changes came with a `docs/` page, linked from `docs/README.md`
+- [ ] `CHANGELOG.md` gained an entry under `[Unreleased]`
 
 ## Commit style
 
