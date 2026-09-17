@@ -34,12 +34,13 @@ const pickId = (captured, req) => {
   return null;
 };
 
-const recordAudit = async ({ actor_id, action, target_type, target_id, before, after, ip, user_agent }) => {
+const recordAudit = async ({ actor_id, project_id, action, target_type, target_id, before, after, ip, user_agent }) => {
   if (!isAuditEnabled()) return null;
   try {
-    return await prisma.auditEvent.create({
+    const row = await prisma.auditEvent.create({
       data: {
         actor: Number.isInteger(actor_id) ? { connect: { id: actor_id } } : undefined,
+        project_id: Number.isInteger(project_id) && project_id > 0 ? project_id : 1,
         action,
         target_type,
         target_id: Number.isInteger(target_id) ? target_id : null,
@@ -50,6 +51,27 @@ const recordAudit = async ({ actor_id, action, target_type, target_id, before, a
         metadata: { before, after },
       },
     });
+    // Audit C1: do NOT log the raw `metadata` blob to stdout. It carries
+    // `before`/`after` snapshots of every mutation, which can include
+    // user-controlled test-case bodies, webhook URLs/secrets, and PII
+    // (emails, IPs). Stdout goes to the container's log stream and is
+    // commonly ingested by log aggregators with weaker ACLs than the DB.
+    // Log only the identifying fields so operators can correlate the
+    // log line back to the row without exposing payload data.
+    console.log(
+      '[AUDIT CREATED]',
+      JSON.stringify({
+        id: row.id,
+        action: row.action,
+        target_type: row.target_type,
+        target_id: row.target_id,
+        actor_id: row.actor_id,
+        project_id: row.project_id,
+        created_at: row.created_at,
+        has_metadata: Boolean(row.metadata),
+      })
+    );
+    return row;
   } catch (e) {
     console.error('[audit] failed to record', action, e.message);
     return null;
@@ -123,6 +145,7 @@ const withAudit = (action, fn, opts = {}) => async (req, res, next) => {
   try {
     await recordAudit({
       actor_id: req.user ? req.user.id : null,
+      project_id: req.user ? req.user.projectId : 1,
       action,
       target_type: targetType,
       target_id: targetId,
