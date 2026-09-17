@@ -34,24 +34,9 @@ const writeArtifact = (runId, name, data) => {
 
 const artifactPath = (runId, name) => path.join(artifactDir(runId), name);
 
-// Best-effort recursive delete. Used to clean up after errored runs.
-// Not throwing because the storage tree is internal to the executor and
-// a stale file there is harmless.
-const removeArtifacts = (runId) => {
-  const dir = artifactDir(runId);
-  try {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir)) {
-      try { fs.unlinkSync(path.join(dir, entry)); } catch (_) {}
-    }
-    try { fs.rmdirSync(dir); } catch (_) {}
-  } catch (_) {}
-};
-
 module.exports = {
   ROOT,
   artifactDir,
   artifactPath,
   writeArtifact,
-  removeArtifacts,
 };

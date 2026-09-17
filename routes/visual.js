@@ -101,7 +101,7 @@ router.post(
     const diffName = 'artifacts/diff.png';
     fs.writeFileSync(artifactPath(run.id, diffName), encodePng(result.width, result.height, result.diff));
 
-    run = await prisma.testRun.update({
+    const updated = await prisma.testRun.update({
       where: { id: run.id },
       data: {
         screenshot_before: beforeName,
@@ -112,11 +112,11 @@ router.post(
     });
 
     res.json({
-      diff_score: run.diff_score,
-      verdict: diffScoreToVerdict(run.diff_score),
-      screenshot_before: run.screenshot_before,
-      screenshot_after: run.screenshot_after,
-      diff_image: run.diff_image,
+      diff_score: updated.diff_score,
+      verdict: diffScoreToVerdict(updated.diff_score),
+      screenshot_before: updated.screenshot_before,
+      screenshot_after: updated.screenshot_after,
+      diff_image: updated.diff_image,
     });
   }, { target_type: 'run', targetId: (req) => parseId(req.params.id) })
 );

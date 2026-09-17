@@ -94,6 +94,14 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
 
     let stdoutBuf = '';
     let stderrBuf = '';
+    // Audit E (memory-DoS): a chatty or hostile snippet (e.g. an
+    // infinite console.log in the user's executable_snippet) would
+    // grow these buffers without bound and OOM the Node process
+    // before 'exit' fired. Cap each to a rolling window that holds
+    // comfortably more than the post-exit artifact slice so we never
+    // log-truncate twice.
+    const STDOUT_CAP = 256 * 1024;
+    const STDERR_CAP = 256 * 1024;
 
     // Both 'error' AND 'exit' can fire on the same child — Node emits
     // 'error' if the spawn itself fails (ENOENT, EACCES, etc.) and
@@ -107,12 +115,12 @@ async function executeCase({ caseId, runId, snippet, runById: _runById }) {
 
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString();
-      stdoutBuf += text;
+      stdoutBuf = (stdoutBuf + text).slice(-STDOUT_CAP);
       runStream.emit(runId, 'stdout', text);
     });
     child.stderr.on('data', (chunk) => {
       const text = chunk.toString();
-      stderrBuf += text;
+      stderrBuf = (stderrBuf + text).slice(-STDERR_CAP);
       runStream.emit(runId, 'stderr', text);
     });
 

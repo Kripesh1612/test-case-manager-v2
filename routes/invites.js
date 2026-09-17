@@ -63,13 +63,19 @@ router.post(
   validate(inviteCreateSchema),
   withAudit('invite.create', async (req, res) => {
     const { email, role, project_id } = req.body;
-    // Invite lands in the admin's active project by default; the client
-    // can over-ride with an explicit project_id (validated to exist).
+    // Audit E (RBAC): the invite is anchored to the calling admin's own
+    // project. Previously an admin in project 1 could mint an
+    // admin-role invite for project 2 by passing an arbitrary
+    // project_id — bypassing any in-project governance on the other
+    // side. Cross-project invites would require explicit operator
+    // approval (e.g. via a SUPER_ADMIN env), which we don't model.
+    // Reject overrides outright so the boundary is visible in the API
+    // contract rather than implicit.
     let targetProject = req.user.projectId;
-    if (project_id !== undefined) {
-      const project = await prisma.project.findUnique({ where: { id: project_id } });
-      if (!project) return res.status(400).json({ error: 'project_id does not reference a project' });
-      targetProject = project_id;
+    if (project_id !== undefined && project_id !== req.user.projectId) {
+      return res.status(403).json({
+        error: 'project_id must match the calling admin\'s active project',
+      });
     }
     const ttlDays = getInviteTtlDays();
     const token = crypto.randomBytes(32).toString('hex');

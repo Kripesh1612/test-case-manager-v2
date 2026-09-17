@@ -155,9 +155,13 @@ router.put(
     // who triggered the update, not the original creator). The
     // snapshot helper uses its own Prisma client (see utils/snapshot.js)
     // — if it fails, the update has already committed and we don't want
-    // to roll it back. Logging-only failure is fine; in practice the
-    // helper throws before ever reaching DB write.
-    await snapshotCase(updated.id, req.user?.id ?? null);
+    // to roll it back. Catch and log so the response stays 200; the
+    // next successful edit on this case will produce a snapshot.
+    try {
+      await snapshotCase(updated.id, req.user?.id ?? null);
+    } catch (e) {
+      console.error('[snapshot] post-update snapshot failed for case', updated.id, '-', e.message);
+    }
 
     res.json(serializeTestCase(updated));
   }, {
