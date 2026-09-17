@@ -30,6 +30,10 @@ import { SuiteListPage } from '@/features/suites/SuiteListPage';
 import { SuiteDetailPage } from '@/features/suites/SuiteDetailPage';
 import { SchedulerPage } from '@/features/scheduler/SchedulerPage';
 import { AuditLogPage } from '@/features/audit/AuditLogPage';
+import { WebhooksPage } from '@/features/webhooks/WebhooksPage';
+import { DigestPage } from '@/features/digest/DigestPage';
+import { VisualPage } from '@/features/visual/VisualPage';
+import { ProjectsPage } from '@/features/projects/ProjectsPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -63,6 +67,10 @@ function App() {
               <Route path="/scheduler" element={<SchedulerPage />} />
               <Route path="/admin" element={<AdminRoute />} />
               <Route path="/admin/audit" element={<AdminRoute><AuditLogPage /></AdminRoute>} />
+              <Route path="/admin/webhooks" element={<AdminRoute><WebhooksPage /></AdminRoute>} />
+              <Route path="/admin/digest" element={<AdminRoute><DigestPage /></AdminRoute>} />
+              <Route path="/admin/projects" element={<AdminRoute><ProjectsPage /></AdminRoute>} />
+              <Route path="/visual" element={<VisualPage />} />
               <Route path="/trash" element={<TrashPage />} />
             </Route>
           </Route>

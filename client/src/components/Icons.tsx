@@ -205,4 +205,33 @@ export const Icon = {
       <path d="M3 3v5h5" />
     </svg>
   ),
+  Send: (p: IconProps) => (
+    <svg {...base(p)} {...p}>
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  ),
+  Webhook: (p: IconProps) => (
+    <svg {...base(p)} {...p}>
+      <path d="M6 18a3 3 0 1 0 0-.01" />
+      <path d="M6 15v-3a6 6 0 0 1 12 0v3" />
+      <circle cx="18" cy="18" r="3" />
+      <path d="M9 15h6" />
+    </svg>
+  ),
+  Box: (p: IconProps) => (
+    <svg {...base(p)} {...p}>
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="M3.3 7 12 12l8.7-5" />
+      <path d="M12 22V12" />
+    </svg>
+  ),
+  Users: (p: IconProps) => (
+    <svg {...base(p)} {...p}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
 };

@@ -29,7 +29,7 @@
 // =============================================================================
 
 const { parseId } = require('../utils/params');
-const { NOT_DELETED } = require('../utils/scope');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const requireOwnership = ({ model, idParam = 'id' } = {}) => {
@@ -46,7 +46,9 @@ const requireOwnership = ({ model, idParam = 'id' } = {}) => {
         // Still load the row so downstream handlers can use req.ownership.row.
         const id = parseId(req.params[idParam]);
         if (!id) return res.status(404).json({ error: 'Not found' });
-        const row = await prisma[model].findFirst({ where: { id, ...NOT_DELETED } });
+        const row = await prisma[model].findFirst({
+          where: { id, ...NOT_DELETED, ...projectScope(req.user) },
+        });
         if (!row) return res.status(404).json({ error: 'Not found' });
         req.ownership = { row, bypassed: 'admin' };
         return next();
@@ -56,7 +58,7 @@ const requireOwnership = ({ model, idParam = 'id' } = {}) => {
       if (!id) return res.status(404).json({ error: 'Not found' });
 
       const row = await prisma[model].findFirst({
-        where: { id, ...NOT_DELETED },
+        where: { id, ...NOT_DELETED, ...projectScope(req.user) },
         select: { id: true, created_by_id: true },
       });
       if (!row) return res.status(404).json({ error: 'Not found' });

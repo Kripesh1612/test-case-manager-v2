@@ -60,7 +60,17 @@ Cypress.Commands.add('loginAsAdmin', () => {
       body: { email, password, name: 'Cypress Admin' },
       failOnStatusCode: false,
     })
-    .then(() => cy.login(email, password));
+    .then(() => cy.login(email, password))
+    .then((res) => {
+      return cy
+        .request({
+          method: 'POST',
+          url: '/projects/1/switch',
+          headers: { Authorization: `Bearer ${res.token}` },
+          failOnStatusCode: false,
+        })
+        .then(() => res);
+    });
 });
 
 // Set the token + user in localStorage so the next page load is already authed.
@@ -134,6 +144,23 @@ Cypress.Commands.add('deleteTestSuite', (token, id) => {
     headers: { Authorization: `Bearer ${token}` },
     failOnStatusCode: false,
   });
+});
+
+// Create a project via the admin-only /projects endpoint (Feature 4).
+Cypress.Commands.add('createProject', (token, data = {}) => {
+  return cy
+    .request({
+      method: 'POST',
+      url: '/projects',
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        name: data.name || `Cypress project ${Date.now()}`,
+        slug: data.slug || undefined,
+        description: data.description || '',
+        ...data,
+      },
+    })
+    .then((resp) => resp.body);
 });
 
 // Promote a user to a specific role via the admin endpoint.

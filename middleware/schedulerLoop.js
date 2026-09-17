@@ -34,6 +34,7 @@
 const prisma = require('../db');
 const { nextFireFromExpr, nextFireFromExprInZone } = require('../utils/cron');
 const { NOT_DELETED } = require('../utils/scope');
+const { emitSuiteRunCompleted } = require('../utils/webhooks');
 
 // Default tick interval (ms). Configurable via SCHEDULER_TICK_MS env so
 // tests can crank it down to a few hundred ms.
@@ -107,6 +108,19 @@ const executeJob = async (job, opts = {}) => {
       reason: 'suite has no active member cases',
     };
   }
+
+  // Feature 1 — a scheduler fire is also a suite run completion (with
+  // status 'not_run' since there's no executed verdict yet). Emit the
+  // webhook best-effort; failures only hit the delivery log.
+  emitSuiteRunCompleted({
+    suiteId: suite.id,
+    projectId: job.project_id || 1,
+    outcome: {
+      status: 'not_run',
+      runs_created: caseIds.length,
+      trigger: opts.trigger || 'scheduler',
+    },
+  }).catch((e) => console.error('[webhooks] emit failed:', e.message));
 
   // One TestRun per case — represents "this case was triggered at this
   // time, awaiting execution result". A future test-runner integration

@@ -43,6 +43,12 @@ file in the codebase:
 - [`test-execution.md`](./test-execution.md) — Phase 8: real Cypress run
   via SSE; `utils/executor.js` + `routes/execution.js`.
 - [`invites.md`](./invites.md) — `REGISTRATION_MODE=invite` flow.
+- [`webhooks.md`](./webhooks.md) — Feature 1: signed HTTP notifications on
+  suite-run completion; `utils/webhooks.js` + `routes/webhooks.js`.
+- [`digest.md`](./digest.md) — Feature 2: scheduled email digest of project
+  activity; `utils/digest.js` + `middleware/digestLoop.js`.
+- [`visual-regression.md`](./visual-regression.md) — Feature 3: pixel diffs
+  for runs that capture screenshots; `utils/visualDiff.js` + `routes/visual.js`.
 
 ## Operations
 

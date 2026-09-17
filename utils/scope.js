@@ -20,4 +20,18 @@ const LATEST_RUN_INCLUDE = {
   },
 };
 
-module.exports = { NOT_DELETED, ONLY_DELETED, LATEST_RUN_INCLUDE };
+// Multi-tenant scope helper (Feature 4). Returns a Prisma `where`
+// fragment that pins every query to the caller's project. Every read is
+// scoped AND every write scopes back to its own rows. Unauthenticated
+// (system/scheduler) contexts default to project 1.
+//
+//   router.get('/', requireAuth, asyncHandler(async (req, res) => {
+//     const cases = await prisma.testCase.findMany({
+//       where: { ...NOT_DELETED, ...projectScope(req.user) },
+//     });
+//   });
+const projectScope = (user = {}) => ({
+  project_id: Number.isInteger(user.projectId) && user.projectId > 0 ? user.projectId : 1,
+});
+
+module.exports = { NOT_DELETED, ONLY_DELETED, LATEST_RUN_INCLUDE, projectScope };
