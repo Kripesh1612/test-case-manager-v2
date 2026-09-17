@@ -152,12 +152,11 @@ async function sendDigest(projectId, opts = {}) {
       project_id: digest.project_id,
       sent_at: new Date(),
       recipients: digest.recipients,
-      summary: {
-        window_start: digest.window_start,
-        window_end: digest.window_end,
-        title: digest.title,
-        sections: digest.sections,
-      },
+      // Audit D (denormalization): summary holds ONLY the per-section
+      // counts. window_start/window_end are duplicated on the dedicated
+      // columns above (period_start, period_end); title is a constant
+      // ("Digest") and storing it per-row was pure noise.
+      summary: { sections: digest.sections },
     },
   });
 

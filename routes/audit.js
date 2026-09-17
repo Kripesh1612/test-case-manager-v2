@@ -35,9 +35,20 @@ router.get(
     // Feature 4: the audit trail is tenant-scoped — an admin only ever sees
     // events that happened inside their active project.
     const where = { project_id: req.user.projectId };
-    if (req.query.actor_id) where.actor_id = clampInt(req.query.actor_id, 1, 1e9, 1);
+    // Audit D (input-validation): only set a numeric filter when the query
+    // value actually parses to a positive integer. Without this gate,
+    // a malformed value like `?actor_id=abc` would fall through the
+    // default of 1 inside clampInt and silently filter to actor 1
+    // instead of returning all rows — a quiet data leak.
+    const parsedActorId = req.query.actor_id && Number.parseInt(req.query.actor_id, 10);
+    if (Number.isInteger(parsedActorId) && parsedActorId > 0) {
+      where.actor_id = parsedActorId;
+    }
     if (req.query.target_type) where.target_type = String(req.query.target_type);
-    if (req.query.target_id) where.target_id = clampInt(req.query.target_id, 1, 1e9, 1);
+    const parsedTargetId = req.query.target_id && Number.parseInt(req.query.target_id, 10);
+    if (Number.isInteger(parsedTargetId) && parsedTargetId > 0) {
+      where.target_id = parsedTargetId;
+    }
     if (req.query.action) where.action = String(req.query.action);
 
     const limit = clampInt(req.query.limit, 1, 500, 50);
