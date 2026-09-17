@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
-const { getJwtSecret } = require('./env');
+const { getJwtSecret, getJwtExpiresIn } = require('../utils/settings');
 
 // Audit C18: raise bcrypt cost factor from 10 to 12. The hardware
 // budget for a single bcrypt.compare on a Xeon-class CPU is roughly:
@@ -12,7 +12,7 @@ const { getJwtSecret } = require('./env');
 // hash dump. Existing hashes still verify (the salt is encoded in
 // each one), so this change is forward-only.
 const SALT_ROUNDS = 12;
-const JWT_EXPIRES_IN = '7d';
+const JWT_EXPIRES_IN = getJwtExpiresIn();
 
 // Hash a plain-text password using bcrypt
 const hashPassword = (plain) => bcrypt.hash(plain, SALT_ROUNDS);

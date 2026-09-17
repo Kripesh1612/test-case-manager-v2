@@ -23,7 +23,7 @@
     "cy:run": "RATE_LIMIT_BURST=1 cypress run",
     "cy:run:api": "RATE_LIMIT_BURST=1 cypress run --spec 'cypress/e2e/api/**/*.cy.js'",
     "cy:run:ui": "RATE_LIMIT_BURST=1 cypress run --spec 'cypress/e2e/ui/**/*.cy.js'",
-    "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js utils/executor.test.js utils/webhooks.test.js utils/webhookSecret.test.js utils/auth.test.js utils/digest.test.js utils/visualDiff.test.js middleware/registrationGate.test.js",
+    "test:unit": "node --test utils/cron.test.js utils/flakiness.test.js utils/diff.test.js utils/executor.test.js utils/webhooks.test.js utils/webhookSecret.test.js utils/auth.test.js utils/digest.test.js utils/visualDiff.test.js middleware/registrationGate.test.js shared/schemas/auth.test.mjs",
     "test:coverage": "c8 --reporter=text --reporter=lcov --include='utils/**/*.js' --include='middleware/**/*.js' --exclude='**/*.test.js' npm run test:unit",
     "lint": "eslint utils middleware",
     "lint:fix": "eslint --fix utils middleware",

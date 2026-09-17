@@ -34,7 +34,26 @@ const errorHandler = (err, req, res, next) => {
     return res.status(404).json({ error: 'Resource not found' });
   }
 
-  console.error(err);
+  // Audit C (logging hygiene): printing `err` directly dumps the full
+  // stack, including file paths, internal class names, and for Prisma
+  // errors sometimes SQL fragments. Replace with a redacted summary
+  // that operators can still triage on, without leaking internals to
+  // anyone tailing the log.
+  console.error(
+    '[ERR]',
+    JSON.stringify({
+      method: req?.method,
+      url: req?.originalUrl || req?.url,
+      name: err?.name,
+      message: typeof err?.message === 'string' ? err.message.slice(0, 200) : undefined,
+      code: err?.code,
+      // Stack stays in dev only. NODE_ENV check guards against
+      // accidentally enabling in prod via NODE_ENV=staging, etc.
+      stack: process.env.NODE_ENV === 'production'
+        ? undefined
+        : (typeof err?.stack === 'string' ? err.stack.split('\n').slice(0, 5).join('\n') : undefined),
+    })
+  );
   res.status(500).json({ error: 'Internal server error' });
 };
 

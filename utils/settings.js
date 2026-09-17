@@ -17,8 +17,17 @@ const DEFAULT_TRASH_RETENTION_DAYS = 30;
 const VALID_REGISTRATION_MODES = ['open', 'invite'];
 
 // --- JWT ---
+//
+// Audit C (JWT lifetime): default expiry was 7 days, which gives a
+// stolen cookie-equivalent (Bearer token in localStorage) a full
+// week of access with no rotation. New default is 24h. Operators can
+// extend via JWT_EXPIRES_IN (any string accepted by jsonwebtoken:
+// '7d', '12h', etc.) — see utils/auth.js.
+
+// --- JWT ---
 
 const getJwtSecret = () => process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '24h';
 
 // --- Admin emails ---
 
@@ -83,7 +92,7 @@ const BURST_REGISTER_MAX = 200;
 
 const isBurst = () => {
   const b = process.env.RATE_LIMIT_BURST;
-  if (b == null) return false;
+  if (b === undefined || b === null) return false;
   return b.toLowerCase() === '1' || b.toLowerCase() === 'true' || b.toLowerCase() === 'yes';
 };
 
@@ -137,6 +146,7 @@ const getDigestRecipients = () =>
 
 module.exports = {
   getJwtSecret,
+  getJwtExpiresIn,
   getAdminEmails,
   isAdminEmail,
   getRegistrationMode,
