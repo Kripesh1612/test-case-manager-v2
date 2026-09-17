@@ -1,0 +1,62 @@
+# Tier1-PR-5. Weekly `npm audit` job — fires Dependabot-aware
+# security alerts faster than Dependabot's weekly PR cadence catches
+# them. The job runs `npm audit --audit-level=high` so only
+# high/critical CVEs fail the build; moderate-and-below keep
+# reporting without blocking CI.
+name: npm audit
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC. Dependabot opens its PRs two hours later,
+    # so this job effectively pre-screens the next day's update
+    # candidates and can fail loudly if a fresh CVE landed.
+    - cron: "0 6 * * 1"
+  # Allow the workflow to fire on demand from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  # read-only is enough for `npm audit`; never need write.
+  contents: read
+
+jobs:
+  audit:
+    name: npm audit (high+ critical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # `npm ci` is the deterministic sibling of `npm install` for
+        # CI — uses package-lock.json exactly. Needed because `npm
+        # audit` walks the resolved tree from package-lock.
+        run: npm ci
+
+      - name: Run npm audit
+        # `--audit-level=high` flags high + critical CVEs only. We
+        # deliberately accept moderate / low noise here — they go to
+        # the GitHub Security tab via `npm audit --json`, which the
+        # next step surfaces, without blocking this job.
+        run: npm audit --audit-level=high
+
+      - name: Upload full audit JSON (always)
+        # Even on a clean audit, capture the full report so a reviewer
+        # can see what was checked. On failure, the same artifact
+        # makes triage possible from a UI without re-running locally.
+        if: always()
+        run: |
+          mkdir -p audit-output
+          npm audit --json > audit-output/npm-audit.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-report
+          path: audit-output/npm-audit.json
+          retention-days: 30

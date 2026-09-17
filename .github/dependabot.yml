@@ -1,0 +1,31 @@
+# Tier1-PR-5. Dependabot keeps runtime + dev deps up to date without
+# requiring manual `npm outdated` sweeps. Weekly cadence is plenty
+# for a non-incident-prone React/Express/Prisma stack — the npm-audit
+# workflow below catches the urgent CVEs faster than this would.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "UTC"
+    # Group patch + minor so PR volume stays low — one PR per week
+    # rather than 12 separate ones for transitive updates.
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    # Allow up to 5 open PRs at once; older ones get auto-closed by
+    # Dependabot once the dependency is updated again.
+    open-pull-requests-limit: 5
+    # Tag the maintainer so the PR list is filterable.
+    labels:
+      - "dependencies"
+    # Skip major bumps for stability — handle manually.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
