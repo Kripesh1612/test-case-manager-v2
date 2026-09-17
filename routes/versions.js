@@ -25,7 +25,7 @@ const { parseId } = require('../utils/params');
 const { serializeTestCase } = require('../utils/serialize');
 const { snapshotCase, snapshotCaseInTx, toSnapshot } = require('../utils/snapshot');
 const { diffSnapshots } = require('../utils/diff');
-const { projectScope } = require('../utils/scope');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const router = express.Router({ mergeParams: true });
@@ -35,9 +35,9 @@ const router = express.Router({ mergeParams: true });
 // cross-project :caseId 404s before we even touch the versions table.
 async function loadLiveCase(caseId, user) {
   const tc = await prisma.testCase.findFirst({
-    where: { id: caseId, ...projectScope(user) },
+    where: { id: caseId, ...NOT_DELETED, ...projectScope(user) },
   });
-  if (!tc || tc.deleted_at) return null;
+  if (!tc) return null;
   return tc;
 }
 

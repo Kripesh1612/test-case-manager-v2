@@ -84,6 +84,17 @@ router.put(
       return res.status(400).json({ error: `status must be one of ${ALLOWED_RUN_STATUS.join(', ')}` });
     }
 
+    // Audit C (validation): started_at must parse to a real Date. An
+    // invalid value (e.g. 'yesterday') becomes `new Date('yesterday')`
+    // = Invalid Date, and Invalid Date - real Date = NaN, which would
+    // land as duration_ms = NaN in Postgres. Reject up front.
+    if (started_at != null) {
+      const d = new Date(started_at);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'started_at must be a valid date' });
+      }
+    }
+
     const existing = await prisma.testRun.findFirst({
       where: {
         id: runId,
@@ -92,6 +103,19 @@ router.put(
       },
     });
     if (!existing) return res.status(404).json({ error: 'Run not found' });
+
+    // Audit C (idempotency): a run that has already reached a terminal
+    // status shouldn't be silently overwritten — that would let a
+    // duplicated PUT from a flaky executor clobber the real result.
+    // Admins can opt-in to a force-rewrite with `?force=true`.
+    const TERMINAL_STATUSES = ['passed', 'failed', 'errored'];
+    const force = req.query.force === 'true' || req.query.force === '1';
+    if (!force && TERMINAL_STATUSES.includes(existing.status)) {
+      return res.status(409).json({
+        error: 'Run already finalized; pass ?force=true to overwrite',
+        status: existing.status,
+      });
+    }
 
     const data = {};
     if (status) data.status = status;

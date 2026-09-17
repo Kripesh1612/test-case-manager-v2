@@ -30,6 +30,7 @@ const withAudit = require('../middleware/withAudit');
 const { scheduledJobSchema, scheduledJobUpdateSchema } = require('../shared/schemas/scheduledJob');
 const { nextFireFromExpr } = require('../utils/cron');
 const { parseId } = require('../utils/params');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -45,6 +46,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const jobs = await prisma.scheduledJob.findMany({
+      where: projectScope(req.user),
       orderBy: [{ enabled: 'desc' }, { id: 'asc' }],
       include: {
         suite: { select: { id: true, name: true } },
@@ -62,8 +64,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Scheduled job not found' });
-    const job = await prisma.scheduledJob.findUnique({
-      where: { id },
+    const job = await prisma.scheduledJob.findFirst({
+      where: { id, ...projectScope(req.user) },
       include: {
         suite: { select: { id: true, name: true } },
         created_by: { select: { id: true, name: true, email: true } },
@@ -83,6 +85,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Scheduled job not found' });
+    const job = await prisma.scheduledJob.findFirst({
+      where: { id, ...projectScope(req.user) },
+      select: { id: true },
+    });
+    if (!job) return res.status(404).json({ error: 'Scheduled job not found' });
     const events = await prisma.auditEvent.findMany({
       where: { action: 'scheduled_job.fire', target_type: 'scheduled_job', target_id: id },
       orderBy: { created_at: 'desc' },
@@ -101,9 +108,10 @@ router.post(
   withAudit('scheduled_job.create', async (req, res) => {
     const { name, cron, timezone, suite_id, enabled, max_retries } = req.body;
 
-    // Confirm the suite exists and isn't soft-deleted.
+    // Confirm the suite exists, isn't soft-deleted, and lives in the caller's
+    // project (a job may never target another tenant's suite).
     const suite = await prisma.testSuite.findFirst({
-      where: { id: suite_id, deleted_at: null },
+      where: { id: suite_id, ...NOT_DELETED, ...projectScope(req.user) },
       select: { id: true },
     });
     if (!suite) return res.status(400).json({ error: 'suite_id does not reference an active suite' });
@@ -117,6 +125,7 @@ router.post(
         cron,
         timezone: timezone || 'UTC',
         suite_id,
+        project_id: projectScope(req.user).project_id,
         enabled: enabled === undefined ? true : enabled,
         max_retries: max_retries || 0,
         next_run_at: nextRun,
@@ -141,7 +150,9 @@ router.patch(
   withAudit('scheduled_job.update', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Scheduled job not found' });
-    const existing = await prisma.scheduledJob.findUnique({ where: { id } });
+    const existing = await prisma.scheduledJob.findFirst({
+      where: { id, ...projectScope(req.user) },
+    });
     if (!existing) return res.status(404).json({ error: 'Scheduled job not found' });
 
     const { name, cron, timezone, suite_id, enabled, max_retries } = req.body;
@@ -152,7 +163,7 @@ router.patch(
     if (max_retries !== undefined) data.max_retries = max_retries;
     if (suite_id !== undefined) {
       const suite = await prisma.testSuite.findFirst({
-        where: { id: suite_id, deleted_at: null },
+        where: { id: suite_id, ...NOT_DELETED, ...projectScope(req.user) },
         select: { id: true },
       });
       if (!suite) return res.status(400).json({ error: 'suite_id does not reference an active suite' });
@@ -196,7 +207,7 @@ router.delete(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Scheduled job not found' });
     // updateMany + count check so we can distinguish "not found" from "already gone".
-    const result = await prisma.scheduledJob.deleteMany({ where: { id } });
+    const result = await prisma.scheduledJob.deleteMany({ where: { id, ...projectScope(req.user) } });
     if (result.count === 0) return res.status(404).json({ error: 'Scheduled job not found' });
     res.status(204).send();
   }, {
@@ -221,7 +232,9 @@ router.post(
   withAudit('scheduled_job.fire', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Scheduled job not found' });
-    const job = await prisma.scheduledJob.findUnique({ where: { id } });
+    const job = await prisma.scheduledJob.findFirst({
+      where: { id, ...projectScope(req.user) },
+    });
     if (!job) return res.status(404).json({ error: 'Scheduled job not found' });
 
     // Lazy-require to avoid a circular import (schedulerLoop -> routes).
