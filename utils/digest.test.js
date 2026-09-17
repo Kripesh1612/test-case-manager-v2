@@ -132,12 +132,91 @@ test('sendDigest persists a digest_log entry and returns log_id + delivery', asy
 
 // ---- digest loop (existing) ----------------------------------------------
 
-test('digest loop respects DIGEST_ENABLED gating', async () => {
+test('digest loop respects DIGEST_ENABLED gating (any truthy value enables)', async () => {
+  // Audit B1: the loop previously checked `process.env.DIGEST_ENABLED !== '1'`
+  // which silently disabled the loop when an operator set `DIGEST_ENABLED=true`
+  // (the canonical helper accepts any truthy value). Verify all common
+  // truthy spellings now flip the loop on.
   const old = process.env.DIGEST_ENABLED;
+  // Untouched env var → off.
   delete process.env.DIGEST_ENABLED;
   assert.equal(await tick({ prisma: makeFakePrisma() }), false);
+
+  // 'true', 'yes', 'TRUE', '1' all enable.
+  for (const v of ['true', 'TRUE', 'yes', '1']) {
+    process.env.DIGEST_ENABLED = v;
+    // Use a prisma that always reports the schedule is due AND that no
+    // prior digest exists for this slot.
+    const db = makeFakePrisma({
+      digestLog: {
+        findFirst: async () => null,
+        create: async ({ data }) => ({ id: 99, ...data }),
+      },
+    });
+    _resetForTests();
+    const now = new Date(Date.now() + 2 * 60000);
+    assert.equal(
+      await tick({ prisma: db, now, dry: true }),
+      true,
+      `DIGEST_ENABLED=${v} must enable the loop`,
+    );
+  }
+
+  // Explicitly false still disables.
+  process.env.DIGEST_ENABLED = 'false';
+  _resetForTests();
+  assert.equal(
+    await tick({ prisma: makeFakePrisma() }),
+    false,
+    'DIGEST_ENABLED=false must disable the loop',
+  );
+
   if (old === undefined) delete process.env.DIGEST_ENABLED;
   else process.env.DIGEST_ENABLED = old;
+});
+
+test('digest loop does not re-fire when another instance owns the slot', async () => {
+  // Audit B3: previously the loop relied solely on a module-local
+  // `lastFiredKey` string, so two replicas could both decide "the slot
+  // is mine" and double-send. Now the loop does a DB-level atomic
+  // claim: if any digest_log row already has sent_at >= the next-fire
+  // boundary, this replica defers to the other one.
+  const oldEnabled = process.env.DIGEST_ENABLED;
+  const oldSchedule = process.env.DIGEST_SCHEDULE;
+  process.env.DIGEST_ENABLED = '1';
+  process.env.DIGEST_SCHEDULE = '* * * * *';
+
+  // Fake prisma that reports a row already exists for the slot.
+  const db = {
+    digestLog: {
+      findFirst: async () => null, // for the initial `lastSentAt` lookup
+      create: async ({ data }) => ({ id: 99, ...data }),
+    },
+    testCase: { count: async () => 0 },
+    testRun: { count: async () => 0 },
+  };
+
+  // Patch digestLog.findFirst to return a "claimed" row on the second
+  // call (the slot-claim check).
+  let calls = 0;
+  db.digestLog.findFirst = async () => {
+    calls += 1;
+    if (calls === 1) return null; // lastSentAt — no prior digest
+    return { id: 7, sent_at: new Date(Date.now() + 60_000) }; // slot claimed
+  };
+
+  const now = new Date(Date.now() + 2 * 60000);
+  _resetForTests();
+  assert.equal(
+    await tick({ prisma: db, now, dry: true }),
+    false,
+    'must defer to another instance that already owns the slot',
+  );
+
+  if (oldEnabled === undefined) delete process.env.DIGEST_ENABLED;
+  else process.env.DIGEST_ENABLED = oldEnabled;
+  if (oldSchedule === undefined) delete process.env.DIGEST_SCHEDULE;
+  else process.env.DIGEST_SCHEDULE = oldSchedule;
 });
 
 test('digest loop fires when schedule + window pass', async () => {
