@@ -172,10 +172,8 @@ export function Field({ label, hint, error, leadingIcon, ...inputProps }: FieldP
   );
 }
 
-export function extractError(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = (err as { response?: { data?: { error?: string } } }).response;
-    if (r?.data?.error) return r.data.error;
-  }
-  return fallback;
-}
+// Tier2-PR-9. extractError moved to `@/lib/errors`; re-export it from
+// here so any third-party consumer that imported it from AuthLayout
+// keeps building. Internal callers have already switched to the
+// canonical import.
+export { extractError } from '@/lib/errors';

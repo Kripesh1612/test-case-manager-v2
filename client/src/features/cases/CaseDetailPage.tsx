@@ -19,6 +19,7 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icons';
 import { useAuth } from '@/hooks/useAuth';
+import { extractError } from '@/lib/errors';
 import { showToast } from '@/lib/toast';
 
 import { CaseDiffView } from './CaseDiffView';
@@ -581,12 +582,4 @@ function formatRel(iso: string): string {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   return `${d}d ago`;
-}
-
-function extractError(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = (err as { response?: { data?: { error?: string } } }).response;
-    if (r?.data?.error) return r.data.error;
-  }
-  return fallback;
 }

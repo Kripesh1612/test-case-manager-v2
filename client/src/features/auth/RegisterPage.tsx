@@ -22,7 +22,8 @@ import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { showToast } from '@/lib/toast';
-import { AuthLayout, Field, extractError } from './AuthLayout';
+import { AuthLayout, Field } from './AuthLayout';
+import { extractError } from '@/lib/errors';
 
 type RegisterForm = z.infer<typeof registerSchema>;
 

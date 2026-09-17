@@ -24,7 +24,7 @@ import { http, setToken } from '@/lib/http';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icons';
-import { extractError } from '@/features/auth/AuthLayout';
+import { extractError } from '@/lib/errors';
 
 interface RedeemResponse {
   user: { id: number; email: string; name: string | null; role: string };

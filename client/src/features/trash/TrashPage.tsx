@@ -24,6 +24,7 @@ import { Icon } from '@/components/Icons';
 import { ConfirmModal } from '@/components/Modal';
 import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { extractError } from '@/lib/errors';
 import { showToast } from '@/lib/toast';
 
 import type { TrashedCase, TrashedSuite } from './api';
@@ -287,12 +288,4 @@ function TrashRow({ row, kind, isAdmin, onRestore, onPurge }: TrashRowProps) {
       </td>
     </tr>
   );
-}
-
-function extractError(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = (err as { response?: { data?: { error?: string } } }).response;
-    if (r?.data?.error) return r.data.error;
-  }
-  return fallback;
 }

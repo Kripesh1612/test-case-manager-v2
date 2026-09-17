@@ -25,6 +25,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/Card';
 import { Icon } from '@/components/Icons';
 import { useAuth } from '@/hooks/useAuth';
+import { extractError } from '@/lib/errors';
 import { showToast } from '@/lib/toast';
 
 import type { CaseData } from './api';
@@ -698,12 +699,4 @@ function highlight(text: string, q: string): React.ReactNode {
       <span key={i}>{part}</span>
     ),
   );
-}
-
-function extractError(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const r = (err as { response?: { data?: { error?: string } } }).response;
-    if (r?.data?.error) return r.data.error;
-  }
-  return fallback;
 }
