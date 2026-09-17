@@ -2,6 +2,7 @@ require('./config'); // load .env before anything that reads process.env
 
 const path = require('path');
 const express = require('express');
+const helmet = require('helmet');
 const { errorHandler } = require('./middleware/http');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -34,6 +35,15 @@ const PORT = process.env.PORT || 3001;
 // nginx / Coolify / another reverse proxy. `1` = trust the nearest
 // proxy; bump via TRUST_PROXY env if you put more hops in front.
 app.set('trust proxy', parseInt(process.env.TRUST_PROXY ?? '1', 10) || 1);
+
+// Tier1-PR-3. Set the standard hardened-headers baseline (X-Frame-Options,
+// X-Content-Type-Options, Strict-Transport-Security when behind HTTPS,
+// Referrer-Policy, etc.) before any router runs. contentSecurityPolicy
+// stays disabled by default — we serve the React app's built bundle, and
+// the inline-script fingerprints of dev mode would otherwise force us to
+// hand-curate an allowlist; operators can enable CSP via the env knob
+// below when they're shipping hardened prod.
+app.use(helmet({ contentSecurityPolicy: process.env.CSP_ENABLED === '1' ? undefined : false }));
 
 // Bound JSON bodies. 1 MB is generous for our payloads (largest is a
 // case with long description + many steps) and rejects the obvious
