@@ -29,7 +29,7 @@ const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { scheduledJobSchema, scheduledJobUpdateSchema } = require('../shared/schemas/scheduledJob');
 const { nextFireFromExpr } = require('../utils/cron');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
@@ -41,10 +41,13 @@ const router = express.Router();
 const computeNextRun = (cronExpr) => nextFireFromExpr(cronExpr, new Date());
 
 // LIST — GET /scheduled-jobs (any authed user)
+// Audit C (pagination): capped at 200 rows per call.
 router.get(
   '/',
   requireAuth,
   asyncHandler(async (req, res) => {
+    const limit = clampInt(req.query.limit, 1, 500, 200);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
     const jobs = await prisma.scheduledJob.findMany({
       where: projectScope(req.user),
       orderBy: [{ enabled: 'desc' }, { id: 'asc' }],
@@ -52,8 +55,10 @@ router.get(
         suite: { select: { id: true, name: true } },
         created_by: { select: { id: true, name: true, email: true } },
       },
+      take: limit,
+      skip: offset,
     });
-    res.json(jobs);
+    res.json({ count: jobs.length, limit, offset, jobs });
   })
 );
 

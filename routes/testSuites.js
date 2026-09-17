@@ -6,7 +6,7 @@ const withAudit = require('../middleware/withAudit');
 const { testSuiteSchema, testSuiteUpdateSchema } = require('../shared/schemas/testSuite');
 const { serializeSuite } = require('../utils/serialize');
 const { NOT_DELETED, projectScope } = require('../utils/scope');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const { emitSuiteRunCompleted } = require('../utils/webhooks');
 const prisma = require('../db');
 
@@ -50,16 +50,21 @@ router.post(
 );
 
 // LIST — GET /test-suites (any authenticated user; soft-deleted excluded)
+// Audit C (pagination): capped at 200 rows per call.
 router.get(
   '/',
   requireAuth,
   asyncHandler(async (req, res) => {
+    const limit = clampInt(req.query.limit, 1, 500, 200);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
     const suites = await prisma.testSuite.findMany({
       where: { ...NOT_DELETED, ...projectScope(req.user) },
       orderBy: { id: 'asc' },
+      take: limit,
+      skip: offset,
     });
     const result = await Promise.all(suites.map(serializeSuite));
-    res.json(result);
+    res.json({ count: result.length, limit, offset, suites: result });
   })
 );
 

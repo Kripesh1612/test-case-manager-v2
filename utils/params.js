@@ -11,4 +11,16 @@ const parseId = (raw) => {
   return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-module.exports = { parseId };
+// clampInt — parse a query string and clamp the value into [lo, hi].
+// Returns `dflt` when the input is missing, non-numeric, or NaN.
+//
+// Audit C (pagination): every list endpoint now goes through clampInt
+// to bound the result set. Without a cap, a workspace with 10k cases
+// would dump the entire table in one response. The cap is per-call;
+// clients that need more rows page through via offset.
+const clampInt = (raw, lo, hi, dflt) => {
+  const n = Number.parseInt(raw, 10);
+  return Number.isInteger(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+};
+
+module.exports = { parseId, clampInt };

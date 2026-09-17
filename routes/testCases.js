@@ -8,7 +8,7 @@ const { testCaseSchema, testCaseUpdateSchema } = require('../shared/schemas/test
 const { serializeTestCase } = require('../utils/serialize');
 const { snapshotCase } = require('../utils/snapshot');
 const { NOT_DELETED, projectScope } = require('../utils/scope');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -71,15 +71,22 @@ router.post(
 );
 
 // LIST — GET /test-cases (any authenticated user; soft-deleted excluded)
+// Audit C (pagination): capped at 200 rows per call to avoid an
+// unbounded response on large workspaces. Clients page via
+// ?offset=&limit=.
 router.get(
   '/',
   requireAuth,
   asyncHandler(async (req, res) => {
+    const limit = clampInt(req.query.limit, 1, 500, 200);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
     const cases = await prisma.testCase.findMany({
       where: { ...NOT_DELETED, ...projectScope(req.user) },
       orderBy: { id: 'asc' },
+      take: limit,
+      skip: offset,
     });
-    res.json(cases.map(serializeTestCase));
+    res.json({ count: cases.length, limit, offset, cases: cases.map(serializeTestCase) });
   })
 );
 

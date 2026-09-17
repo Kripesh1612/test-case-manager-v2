@@ -15,7 +15,7 @@ const { asyncHandler } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
@@ -31,11 +31,6 @@ const ALLOWED_RUN_STATUS = ['not_run', 'running', 'passed', 'failed', 'errored']
 // at the router level — the router is mounted at / via app.use(runRoutes)
 // so a router.use(requireAuth) would intercept unrelated paths like
 // /health.
-
-const clampInt = (raw, lo, hi, dflt) => {
-  const n = parseInt(raw, 10);
-  return Number.isInteger(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
-};
 
 // POST /test-cases/:id/runs — start a new run. Default status "not_run"
 // and started_at=now. Returns the run row.
