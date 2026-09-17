@@ -11,13 +11,15 @@
 
 const crypto = require('crypto');
 const express = require('express');
-const { asyncHandler } = require('../middleware/http');
+const { asyncHandler, validate } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { getInviteTtlDays } = require('../utils/settings');
+const { parseId } = require('../utils/params');
 const { hashPassword } = require('../utils/auth');
 const { withProjectName } = require('./projects');
+const { inviteCreateSchema } = require('../shared/schemas/auth');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -55,20 +57,19 @@ router.post(
   '/',
   requireAuth,
   requireRole('admin'),
+  // Audit C (validation): Zod now checks email/role/project_id types
+  // and length caps. The old code accepted a 1-MB email string and
+  // forwarded NaN from `parseInt(project_id)` to Prisma.
+  validate(inviteCreateSchema),
   withAudit('invite.create', async (req, res) => {
-    const { email, role, project_id } = req.body || {};
-    if (!email) return res.status(400).json({ error: 'email is required' });
-    if (role && !['admin', 'editor', 'viewer'].includes(role)) {
-      return res.status(400).json({ error: 'role must be admin, editor, or viewer' });
-    }
+    const { email, role, project_id } = req.body;
     // Invite lands in the admin's active project by default; the client
     // can over-ride with an explicit project_id (validated to exist).
     let targetProject = req.user.projectId;
     if (project_id !== undefined) {
-      const pid = parseInt(project_id, 10);
-      const project = await prisma.project.findUnique({ where: { id: pid } });
+      const project = await prisma.project.findUnique({ where: { id: project_id } });
       if (!project) return res.status(400).json({ error: 'project_id does not reference a project' });
-      targetProject = pid;
+      targetProject = project_id;
     }
     const ttlDays = getInviteTtlDays();
     const token = crypto.randomBytes(32).toString('hex');
@@ -134,22 +135,66 @@ router.post(
     const existing = await prisma.user.findUnique({ where: { email: invite.email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
+    // bcrypt.hash takes ~250 ms and isn't part of the DB transaction,
+    // so we run it before opening the transaction. The transaction
+    // then commits user-create + invite-accepted-stamp atomically.
     const password_hash = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        email: invite.email,
-        password_hash,
-        name,
-        role: invite.role,
-        // Feature 4: redeem drops the user into the invite's project.
-        project_id: invite.project_id || 1,
-      },
-    });
 
-    await prisma.invite.update({
-      where: { id: invite.id },
-      data: { accepted_at: new Date() },
-    });
+    // Audit C5 — atomic redeem:
+    // Two clients hitting `Accept` simultaneously could otherwise both
+    // pass the `accepted_at IS NULL` check above, both create a user
+    // (only one winning on the email unique — confusing 409 on a
+    // happy-path flow), and race on stamping accepted_at. The unique
+    // constraint on User.email gives us partial safety, but we also
+    // want the invite state transition to commit atomically.
+    //
+    // We use `update` (which throws P2025 on a missing/stale row)
+    // rather than `updateMany` so the transaction aborts cleanly if
+    // a concurrent redeem beat us to the punch.
+    let user;
+    try {
+      user = await prisma.$transaction(async (tx) => {
+        // The compound `accepted_at: null, expires_at: gt now` clause
+        // isn't a unique constraint, so prisma.update can't enforce
+        // it. We use updateMany + count = 1 as the atomic claim: if a
+        // concurrent redeem already flipped accepted_at, the count is
+        // 0 and we abort the transaction by throwing.
+        const claim = await tx.invite.updateMany({
+          where: {
+            id: invite.id,
+            accepted_at: null,
+            expires_at: { gt: new Date() },
+          },
+          data: { accepted_at: new Date() },
+        });
+        if (claim.count !== 1) {
+          const err = new Error('invite was claimed by a concurrent request');
+          err.code = 'P2025';
+          throw err;
+        }
+        return tx.user.create({
+          data: {
+            email: invite.email,
+            password_hash,
+            name,
+            role: invite.role,
+            // Feature 4: redeem drops the user into the invite's project.
+            project_id: invite.project_id || 1,
+          },
+        });
+      });
+    } catch (e) {
+      // P2025 from the update → a concurrent caller already accepted it.
+      if (e && e.code === 'P2025') {
+        return res.status(410).json({ error: 'Invite already used' });
+      }
+      // P2002 from the user create → duplicate email, even though our
+      // pre-check thought we were clear. Surface the standard message.
+      if (e && e.code === 'P2002') {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      throw e;
+    }
 
     // Issue a JWT so the user is logged in immediately.
     const { generateToken } = require('../utils/auth');
@@ -177,14 +222,14 @@ router.delete(
   requireAuth,
   requireRole('admin'),
   withAudit('invite.revoke', async (req, res) => {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isInteger(id)) return res.status(404).json({ error: 'Invite not found' });
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'Invite not found' });
     const result = await prisma.invite.deleteMany({ where: { id, project_id: req.user.projectId } });
     if (result.count === 0) return res.status(404).json({ error: 'Invite not found' });
     res.status(204).send();
   }, {
     target_type: 'invite',
-    targetId: (req) => parseInt(req.params.id, 10),
+    targetId: (req) => parseId(req.params.id),
   })
 );
 

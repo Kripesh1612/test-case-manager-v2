@@ -5,8 +5,9 @@ const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { testSuiteSchema, testSuiteUpdateSchema } = require('../shared/schemas/testSuite');
 const { serializeSuite } = require('../utils/serialize');
-const { NOT_DELETED } = require('../utils/scope');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const { parseId } = require('../utils/params');
+const { emitSuiteRunCompleted } = require('../utils/webhooks');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -20,9 +21,23 @@ router.post(
   withAudit('test_suite.create', async (req, res) => {
     const { name, description, test_case_ids } = req.body;
     const suite = await prisma.testSuite.create({
-      data: { name, description: description || '' },
+      data: {
+        name,
+        description: description || '',
+        // Feature 4: suites live in the creator's project.
+        project_id: projectScope(req.user).project_id,
+      },
     });
     if (test_case_ids && test_case_ids.length > 0) {
+      // Only attach cases from the caller's project — filtering silently
+      // would hide a caller bug, so we reject the whole create instead.
+      const owned = await prisma.testCase.count({
+        where: { id: { in: test_case_ids }, ...NOT_DELETED, ...projectScope(req.user) },
+      });
+      if (owned !== test_case_ids.length) {
+        await prisma.testSuite.delete({ where: { id: suite.id } });
+        return res.status(400).json({ error: 'test_case_ids must reference cases in your project' });
+      }
       await prisma.testSuiteCase.createMany({
         data: test_case_ids.map((caseId) => ({
           test_case_id: caseId,
@@ -40,7 +55,7 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const suites = await prisma.testSuite.findMany({
-      where: NOT_DELETED,
+      where: { ...NOT_DELETED, ...projectScope(req.user) },
       orderBy: { id: 'asc' },
     });
     const result = await Promise.all(suites.map(serializeSuite));
@@ -55,7 +70,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Test suite not found' });
-    const suite = await prisma.testSuite.findFirst({ where: { id, ...NOT_DELETED } });
+    const suite = await prisma.testSuite.findFirst({ where: { id, ...NOT_DELETED, ...projectScope(req.user) } });
     if (!suite) return res.status(404).json({ error: 'Test suite not found' });
     res.json(await serializeSuite(suite));
   })
@@ -70,23 +85,43 @@ router.put(
   withAudit('test_suite.update', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Test suite not found' });
+    const existing = await prisma.testSuite.findFirst({
+      where: { id, ...NOT_DELETED, ...projectScope(req.user) },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Test suite not found' });
     const { name, description, test_case_ids } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (description !== undefined) data.description = description;
     const updated = await prisma.testSuite.update({ where: { id }, data });
-    if (test_case_ids !== undefined) {
-      await prisma.testSuiteCase.deleteMany({ where: { test_suite_id: id } });
-      if (test_case_ids.length > 0) {
-        await prisma.testSuiteCase.createMany({
-          data: test_case_ids.map((caseId) => ({
-            test_case_id: caseId,
-            test_suite_id: id,
-          })),
-        });
+    // Audit C7 — atomic suite link rewrite. The previous sequence was:
+//   update suite -> deleteMany old links -> createMany new links.
+// A failure between steps would leave the suite pointing at a partial
+// link set (or none at all). Wrap the link rewrite in a transaction
+// so it rolls back together.
+if (test_case_ids !== undefined) {
+      // Same project-owned validation the create path applies.
+      const owned = await prisma.testCase.count({
+        where: { id: { in: test_case_ids }, ...NOT_DELETED, ...projectScope(req.user) },
+      });
+      if (owned !== test_case_ids.length) {
+        return res.status(400).json({ error: 'test_case_ids must reference cases in your project' });
       }
+      await prisma.$transaction(async (tx) => {
+        await tx.testSuiteCase.deleteMany({ where: { test_suite_id: id } });
+        if (test_case_ids.length > 0) {
+          await tx.testSuiteCase.createMany({
+            data: test_case_ids.map((caseId) => ({
+              test_case_id: caseId,
+              test_suite_id: id,
+            })),
+          });
+        }
+      });
     }
-    res.json(await serializeSuite(updated));
+    const fresh = await prisma.testSuite.findFirst({ where: { id, ...NOT_DELETED, ...projectScope(req.user) } });
+    res.json(await serializeSuite(fresh || updated));
   }, {
     target_type: 'test_suite',
     targetId: (req) => parseId(req.params.id),
@@ -106,7 +141,7 @@ router.delete(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Test suite not found' });
     const result = await prisma.testSuite.updateMany({
-      where: { id, ...NOT_DELETED },
+      where: { id, ...NOT_DELETED, ...projectScope(req.user) },
       data: { deleted_at: new Date() },
     });
     if (result.count === 0) {
@@ -134,6 +169,11 @@ router.post(
   withAudit('test_suite.run', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Test suite not found' });
+    const suite = await prisma.testSuite.findFirst({
+      where: { id, ...NOT_DELETED, ...projectScope(req.user) },
+      select: { id: true },
+    });
+    if (!suite) return res.status(404).json({ error: 'Test suite not found' });
     const targetResult = (req.body && req.body.result) || 'passed';
     if (!['passed', 'failed'].includes(targetResult)) {
       return res.status(400).json({ error: 'result must be "passed" or "failed"' });
@@ -169,6 +209,19 @@ router.post(
     } catch (_) { /* swallow — the suite-update is the source of truth */ }
 
     res.json({ updated: result.count, suite_id: id, result: targetResult });
+
+    // Feature 1 — firing a suite produces a suite.run.completed event for
+    // every registered webhook. Best-effort: never block the response on
+    // network delivery; failures are recorded in webhook_deliveries.
+    emitSuiteRunCompleted({
+      suiteId: id,
+      projectId: req.user.projectId || 1,
+      outcome: {
+        status: result.count > 0 ? targetResult : 'skipped',
+        updated: result.count,
+        run_by: req.user.email,
+      },
+    }).catch((e) => console.error('[webhooks] emit failed:', e.message));
   }, {
     target_type: 'test_suite',
     targetId: (req) => parseId(req.params.id),

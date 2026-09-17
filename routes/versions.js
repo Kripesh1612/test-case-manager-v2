@@ -19,20 +19,24 @@ const express = require('express');
 const { asyncHandler } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
+const requireOwnership = require('../middleware/requireOwnership');
 const withAudit = require('../middleware/withAudit');
 const { parseId } = require('../utils/params');
 const { serializeTestCase } = require('../utils/serialize');
-const { snapshotCase, toSnapshot } = require('../utils/snapshot');
+const { snapshotCase, snapshotCaseInTx, toSnapshot } = require('../utils/snapshot');
 const { diffSnapshots } = require('../utils/diff');
+const { projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const router = express.Router({ mergeParams: true });
 
-// Helper: load the case + verify it exists + is not soft-deleted. Used
-// at the top of every endpoint so a bad :caseId 404s before we even
-// touch the versions table.
-async function loadLiveCase(caseId) {
-  const tc = await prisma.testCase.findUnique({ where: { id: caseId } });
+// Helper: load the case + verify it exists + is not soft-deleted + belongs
+// to the caller's project. Used at the top of every endpoint so a bad or
+// cross-project :caseId 404s before we even touch the versions table.
+async function loadLiveCase(caseId, user) {
+  const tc = await prisma.testCase.findFirst({
+    where: { id: caseId, ...projectScope(user) },
+  });
   if (!tc || tc.deleted_at) return null;
   return tc;
 }
@@ -53,7 +57,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const caseId = parseId(req.params.caseId);
     if (!caseId) return res.status(404).json({ error: 'Test case not found' });
-    const tc = await loadLiveCase(caseId);
+    const tc = await loadLiveCase(caseId, req.user);
     if (!tc) return res.status(404).json({ error: 'Test case not found' });
 
     const versions = await prisma.testCaseVersion.findMany({
@@ -85,7 +89,7 @@ router.get(
     if (!caseId || !versionId) {
       return res.status(404).json({ error: 'Version not found' });
     }
-    const tc = await loadLiveCase(caseId);
+    const tc = await loadLiveCase(caseId, req.user);
     if (!tc) return res.status(404).json({ error: 'Test case not found' });
 
     const v = await loadVersion(caseId, versionId);
@@ -122,7 +126,7 @@ router.get(
     if (!caseId || !fromId || !toId) {
       return res.status(404).json({ error: 'Version not found' });
     }
-    const tc = await loadLiveCase(caseId);
+    const tc = await loadLiveCase(caseId, req.user);
     if (!tc) return res.status(404).json({ error: 'Test case not found' });
 
     const [a, b] = await Promise.all([loadVersion(caseId, fromId), loadVersion(caseId, toId)]);
@@ -146,6 +150,11 @@ router.post(
   '/:versionId/restore',
   requireAuth,
   requireRole('admin', 'editor'),
+  // Audit C (RBAC): restore is effectively a write to the live row,
+  // so an editor must own the case. Admins bypass the check inside
+  // requireOwnership. Without this guard, an editor could restore a
+  // case authored by someone else, undoing that person's last save.
+  requireOwnership({ model: 'testCase' }),
   withAudit(
     'test_case.restore',
     async (req, res) => {
@@ -154,34 +163,36 @@ router.post(
       if (!caseId || !versionId) {
         return res.status(404).json({ error: 'Version not found' });
       }
-      const tc = await loadLiveCase(caseId);
+      const tc = await loadLiveCase(caseId, req.user);
       if (!tc) return res.status(404).json({ error: 'Test case not found' });
 
       const v = await loadVersion(caseId, versionId);
       if (!v) return res.status(404).json({ error: 'Version not found' });
 
       const snap = v.snapshot;
-      const updated = await prisma.testCase.update({
-        where: { id: caseId },
-        data: {
-          title: snap.title,
-          description: snap.description,
-          steps: snap.steps,
-          expected_result: snap.expected_result,
-          priority: snap.priority,
-          status: snap.status,
-          tags: snap.tags,
-          // NOTE: result + last_run_at are NOT in the snapshot (they're
-          // metadata, not content). Restore leaves them as they are on
-          // the live row.
-        },
+      // Audit C3 — restore atomically: update the live row AND write
+      // the post-restore version in a single transaction. Previously
+      // these were separate Prisma calls and a partial failure could
+      // leave the case updated with no history of the restore.
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.testCase.update({
+          where: { id: caseId },
+          data: {
+            title: snap.title,
+            description: snap.description,
+            steps: snap.steps,
+            expected_result: snap.expected_result,
+            priority: snap.priority,
+            status: snap.status,
+            tags: snap.tags,
+            // NOTE: result + last_run_at are NOT in the snapshot (they're
+            // metadata, not content). Restore leaves them as they are on
+            // the live row.
+          },
+        });
+        await snapshotCaseInTx(tx, caseId, req.user?.id ?? null);
+        return u;
       });
-
-      // Snapshot the post-restore state. created_by_id is the user who
-      // triggered the restore, so the diff between (v) and (this new
-      // snapshot) is a no-op (the fields are identical) — which is
-      // intentional: it records the "I restored this" event.
-      await snapshotCase(caseId, req.user?.id ?? null);
 
       res.json(serializeTestCase(updated));
     },
