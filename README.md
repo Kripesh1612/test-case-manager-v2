@@ -258,13 +258,13 @@ See [`utils/settings.js`](./utils/settings.js) for the canonical list and defaul
 
 ```bash
 npm run cy:open        # interactive Cypress runner
-npm run cy:run         # headless, full Cypress suite (256 tests, ~3 min)
+npm run cy:run         # headless, full Cypress suite (263 tests, ~3 min)
 npm run test:unit      # Node unit suite (152 tests, < 1 s)
-npm run cy:run:api     # 154 API-level contract tests only
+npm run cy:run:api     # 161 API-level contract tests only
 npm run cy:run:ui      # 96 UI-level end-to-end tests only
 ```
 
-All 408 tests should be green. If you want to understand them, walk through
+All 415 tests should be green. If you want to understand them, walk through
 [`docs/learning-path.md`](./docs/learning-path.md) for the recommended order,
 or read [`docs/cypress-patterns.md`](./docs/cypress-patterns.md) for a
 catalog of every pattern used.
@@ -362,7 +362,7 @@ curriculum is in [`docs/learning-path.md`](./docs/learning-path.md).
 ├── shared/schemas/               Zod schemas shared between client and server
 ├── prisma/                       Schema + Postgres migrations
 ├── cypress/
-│   ├── e2e/api/                  154 contract tests (no browser)
+│   ├── e2e/api/                  161 contract tests (no browser)
 │   ├── e2e/ui/                   96 end-to-end tests (real browser)
 │   ├── fixtures/                 Sample JSON
 │   └── support/                  Custom commands (loginAsAdmin, createTestCase, ...)
@@ -391,7 +391,7 @@ Completed:
 - [x] Postman collection (with pre-request scripts)
 - [x] Vanilla-JS UI in `public/`
 - [x] RBAC (admin / editor / viewer) — enforced on server *and* UI
-- [x] Cypress — 256 tests across API + UI
+- [x] Cypress — 263 tests across API + UI
 - [x] Advanced Cypress patterns — `cy.intercept()` + `cy.fixture()`
 - [x] Docs that read like a curriculum
 - [x] Docker + env config

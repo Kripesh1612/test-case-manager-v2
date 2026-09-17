@@ -54,8 +54,8 @@ Run the fast ones first, then the full suite:
 
 ```bash
 npm run lint             # ESLint on utils/ + middleware/
-npm run test:unit        # Node node:test unit suite (132 cases, < 1 s)
-npm run cy:run           # full Cypress suite (256 tests, ~3 min)
+npm run test:unit        # Node node:test unit suite (152 cases, < 1 s)
+npm run cy:run           # full Cypress suite (263 tests, ~3 min)
 ```
 
 CI runs `npm ci` → `prisma migrate deploy` → `npm run lint` →

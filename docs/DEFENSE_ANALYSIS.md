@@ -148,7 +148,7 @@ The trade-off is documented in `docs/production-hardening.md:108-115`: in-proces
 
    ┌────────────────────┐    ┌────────────────────┐
    │  Cypress (CI)      │    │  Cypress (local)   │
-   │  218 tests         │    │  cy:open / cy:run  │
+   │  263 tests         │    │  cy:open / cy:run  │
    └────────────────────┘    └────────────────────┘
 ```
 
