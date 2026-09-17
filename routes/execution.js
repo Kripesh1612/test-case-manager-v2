@@ -24,7 +24,7 @@ const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { parseId } = require('../utils/params');
-const { NOT_DELETED } = require('../utils/scope');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const { executeCase } = require('../utils/executor');
 const runStream = require('../utils/runStream');
 const prisma = require('../db');
@@ -49,7 +49,7 @@ router.post(
       if (!caseId) return res.status(404).json({ error: 'Case not found' });
 
       const tc = await prisma.testCase.findFirst({
-        where: { id: caseId, ...NOT_DELETED },
+        where: { id: caseId, ...NOT_DELETED, ...projectScope(req.user) },
         select: { id: true, executable_snippet: true },
       });
       if (!tc) return res.status(404).json({ error: 'Case not found' });
@@ -110,8 +110,8 @@ router.get(
     const runId = parseId(req.params.id);
     if (!runId) return res.status(404).end();
 
-    const run = await prisma.testRun.findUnique({
-      where: { id: runId },
+    const run = await prisma.testRun.findFirst({
+      where: { id: runId, test_case: { project_id: req.user.projectId } },
       select: { id: true, status: true },
     });
     if (!run) return res.status(404).end();

@@ -229,9 +229,11 @@ async function analyzeFlakinessForCase(caseId, opts = {}) {
  * `threshold` defaults to 50 (the "flaky" cutoff). Pass 25 to include
  * "possibly flaky" too.
  */
-async function findFlakyCases(threshold = 50) {
+async function findFlakyCases(threshold = 50, projectId = 1) {
+  // Feature 4: the analysis is per-project — a team's flaky list must not
+  // leak the neighbour project's cases into the dashboard widget.
   const cases = await prisma.testCase.findMany({
-    where: { deleted_at: null },
+    where: { deleted_at: null, project_id: projectId },
     select: { id: true, title: true },
   });
 

@@ -11,7 +11,7 @@ const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { parseId } = require('../utils/params');
-const { ONLY_DELETED } = require('../utils/scope');
+const { ONLY_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -26,7 +26,7 @@ router.get(
   '/cases',
   asyncHandler(async (req, res) => {
     const rows = await prisma.testCase.findMany({
-      where: ONLY_DELETED,
+      where: { ...ONLY_DELETED, ...projectScope(req.user) },
       orderBy: [{ deleted_at: 'desc' }, { id: 'desc' }],
       take: 200,
     });
@@ -39,7 +39,7 @@ router.get(
   '/suites',
   asyncHandler(async (req, res) => {
     const rows = await prisma.testSuite.findMany({
-      where: ONLY_DELETED,
+      where: { ...ONLY_DELETED, ...projectScope(req.user) },
       orderBy: [{ deleted_at: 'desc' }, { id: 'desc' }],
       take: 200,
     });
@@ -55,7 +55,7 @@ router.post(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Case not found' });
     const result = await prisma.testCase.updateMany({
-      where: { id, ...ONLY_DELETED },
+      where: { id, ...ONLY_DELETED, ...projectScope(req.user) },
       data: { deleted_at: null },
     });
     if (result.count === 0) {
@@ -77,7 +77,7 @@ router.post(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Suite not found' });
     const result = await prisma.testSuite.updateMany({
-      where: { id, ...ONLY_DELETED },
+      where: { id, ...ONLY_DELETED, ...projectScope(req.user) },
       data: { deleted_at: null },
     });
     if (result.count === 0) {
@@ -102,7 +102,7 @@ router.delete(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Case not found' });
     const result = await prisma.testCase.deleteMany({
-      where: { id, ...ONLY_DELETED },
+      where: { id, ...ONLY_DELETED, ...projectScope(req.user) },
     });
     if (result.count === 0) {
       return res.status(404).json({ error: 'Case not in trash' });
@@ -122,7 +122,7 @@ router.delete(
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'Suite not found' });
     const result = await prisma.testSuite.deleteMany({
-      where: { id, ...ONLY_DELETED },
+      where: { id, ...ONLY_DELETED, ...projectScope(req.user) },
     });
     if (result.count === 0) {
       return res.status(404).json({ error: 'Suite not in trash' });

@@ -23,6 +23,10 @@ export interface AuthUser {
   email: string;
   name: string;
   role: Role;
+  // Feature 4 — multi-tenant project membership. Every user belongs to
+  // exactly one project; the project switcher (admins) changes these.
+  projectId: number;
+  project_name: string | null;
 }
 
 interface AuthResponse {

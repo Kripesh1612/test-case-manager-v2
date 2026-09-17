@@ -5,6 +5,16 @@ module.exports = defineConfig({
     // The API + UI both run on this port (matches PORT in the server).
     baseUrl: 'http://localhost:3001',
 
+    setupNodeEvents(on, _config) {
+      // Debug helper: surfaces app state into the terminal output.
+      on('task', {
+        log(message) {
+          console.log('[cy-debug]', message);
+          return null;
+        },
+      });
+    },
+
     // Where Cypress looks for specs.
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
 

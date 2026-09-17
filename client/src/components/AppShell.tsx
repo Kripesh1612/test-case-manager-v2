@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/hooks/useAuth';
+import { useProjects, useSwitchProject } from '@/features/projects/hooks';
 import { Logo } from './Logo';
 import { Icon } from './Icons';
 
@@ -39,6 +40,10 @@ const NAV: NavItem[] = [
   { to: '/suites', label: 'Suites', icon: 'Suites', dataCy: 'tab-suites' },
   { to: '/scheduler', label: 'Scheduler', icon: 'Schedule', dataCy: 'tab-scheduler' },
   { to: '/admin', label: 'Admin', icon: 'Admin', roles: ['admin'], dataCy: 'tab-admin' },
+  { to: '/admin/projects', label: 'Projects', icon: 'Box', roles: ['admin'], dataCy: 'tab-projects' },
+  { to: '/admin/webhooks', label: 'Webhooks', icon: 'Webhook', roles: ['admin'], dataCy: 'tab-webhooks' },
+  { to: '/admin/digest', label: 'Digest', icon: 'Mail', roles: ['admin'], dataCy: 'tab-digest' },
+  { to: '/visual', label: 'Visual', icon: 'Cases', roles: ['admin', 'editor'], dataCy: 'tab-visual' },
   { to: '/trash', label: 'Trash', icon: 'Trash', dataCy: 'tab-trash' },
 ];
 
@@ -111,12 +116,16 @@ function TopBar({
   user,
   onLogout,
 }: {
-  user: { email: string; role: 'admin' | 'editor' | 'viewer' } | null;
+  user: { email: string; role: 'admin' | 'editor' | 'viewer'; project_name?: string | null; projectId?: number } | null;
   onLogout: () => void;
 }) {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10 border-b border-border bg-bg/80 backdrop-blur-md">
-      <MobileBrand />
+      <div className="flex items-center gap-3">
+        <MobileBrand />
+        {/* Project badge — admin-only dropdown, read-only chip otherwise. */}
+        <ProjectPicker user={user} />
+      </div>
       <div className="flex items-center gap-2">
         {user ? (
           <ProfileMenu email={user.email} role={user.role} onLogout={onLogout} />
@@ -125,6 +134,101 @@ function TopBar({
         )}
       </div>
     </header>
+  );
+}
+
+// Feature 4 — the active-project control. Admins get a dropdown listing
+// every project (switch = persist my active project). Everyone else just
+// sees a read-only "Project · name" chip.
+function ProjectPicker({
+  user,
+}: {
+  user: { email: string; role: 'admin' | 'editor' | 'viewer'; project_name?: string | null; projectId?: number } | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const { refetch } = useAuth();
+  const projectsQ = useProjects();
+  const switchM = useSwitchProject();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const location = useLocation();
+
+  // Close the menu on route change so a click → navigate doesn't leave the
+  // dropdown visually stuck open.
+  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  if (!user) return null;
+
+  const projectName = user.project_name ?? 'Default';
+  const isAdmin = user.role === 'admin';
+
+  async function onSwitch(id: number) {
+    try {
+      await switchM.mutateAsync(id);
+      await refetch();
+      setOpen(false);
+    } catch (_) {
+      setOpen(false);
+    }
+  }
+
+  const activeName =
+    isAdmin && projectsQ.data
+      ? (projectsQ.data.find((p) => p.id === user.projectId)?.name ?? projectName)
+      : projectName;
+
+  return (
+    <div ref={ref} className="relative hidden sm:block">
+      <button
+        type="button"
+        data-cy="project-picker"
+        data-role={isAdmin ? 'switch' : 'readonly'}
+        onClick={() => setOpen((s) => !s)}
+        disabled={!isAdmin}
+        className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-text-secondary transition-colors"
+        title="Active project"
+      >
+        <Icon.Box size={13} className="text-brand" />
+        <span data-cy="project-picker-active">{activeName}</span>
+        {isAdmin && <Icon.Chevron size={12} className="text-text-tertiary" />}
+      </button>
+      {isAdmin && open && (
+        <div
+          role="menu"
+          className="absolute left-0 mt-1 w-64 rounded-xl border border-border bg-surface shadow-pop overflow-hidden rg-fade-in"
+        >
+          <div className="px-4 py-2 border-b border-border-soft text-xs font-medium uppercase tracking-wide text-text-tertiary">
+            Active project
+          </div>
+          <div className="max-h-72 overflow-y-auto py-1">
+            {(projectsQ.data ?? []).map((p) => {
+              const active = p.id === user.projectId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  data-cy="project-picker-option"
+                  data-project-id={p.id}
+                  onClick={() => onSwitch(p.id)}
+                  className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm text-text hover:bg-surface-hover transition-colors"
+                >
+                  <span className="truncate">{p.name}</span>
+                  {active && <Icon.Check size={13} className="text-brand" />}
+                </button>
+              );
+            })}
+            {!projectsQ.data && <div className="px-4 py-2 text-xs text-text-tertiary">Loading projects…</div>}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

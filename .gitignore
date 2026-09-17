@@ -13,3 +13,6 @@ node_modules/
 
 # c8 coverage output (run npm run test:coverage to regenerate)
 /coverage/
+
+# local run artifacts + generated digest emails
+/storage/
