@@ -90,6 +90,31 @@ minute  hour  day-of-month  month  day-of-week
 
 Each field accepts `*`, `N`, `*/N`, `A-B`, and comma-separated unions.
 
+### Not supported (deliberately)
+
+`utils/cron.js` is intentionally a strict subset of Vixie cron — no
+`cron-parser` style extensions. The following are rejected at parse
+time and surface as `400 Bad Request` from the scheduled-jobs API:
+
+| Syntax          | Means                                  | Status       |
+|-----------------|----------------------------------------|--------------|
+| `@reboot`       | run once when the process starts       | not implemented |
+| `@yearly` / `@annually` | 0 0 1 1 *                    | not implemented |
+| `@monthly`      | 0 0 1 * *                              | not implemented |
+| `@weekly`       | 0 0 * * 0                              | not implemented |
+| `@daily`        | 0 0 * * *                              | not implemented |
+| `@hourly`       | 0 * * * *                              | not implemented |
+| `L`             | "last day" (of month or week)           | not implemented |
+| `W`             | "nearest weekday"                      | not implemented |
+| `#`             | "nth weekday of month" (e.g. `5#2`)    | not implemented |
+| `?`             | Quartz-style "no specific value"       | not implemented |
+
+The deliberate omission is captured in
+[`docs/adr/0002-scheduler-design.md`](./adr/0002-scheduler-design.md)
+under *"Alternatives considered"* (rejected `cron-parser`) and
+*"Follow-ups"*. Adding `@reboot` is the most plausible future ask; the
+other extensions deliberately stay out unless a real suite needs them.
+
 ### DOM/DOW semantics
 
 Per `man 5 crontab`:

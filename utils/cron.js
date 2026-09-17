@@ -13,6 +13,17 @@
 //   A-B      inclusive range
 //   A,B,C    union (mixable with ranges, e.g. "1-5,10,20-25")
 //
+// Not supported (deliberately — see docs/adr/0002-scheduler-design.md
+// "Alternatives considered" and "Follow-ups"):
+//   @reboot / @yearly / @annually / @monthly / @weekly / @daily / @hourly
+//   L         — "last day" (month or week)
+//   W         — "nearest weekday"
+//   #         — "nth weekday of month"
+//   ?         — Quartz-style "no specific value"
+//
+// Expressions using any of these return null from `parse()` and the API
+// surfaces a 400 to the admin UI.
+//
 // Day-of-week vs day-of-month semantics: per Vixie cron, if BOTH fields are
 // restricted (neither is "*"), the trigger fires when EITHER matches. This is
 // the historical Unix behaviour; it's surprising but it's the standard, and
