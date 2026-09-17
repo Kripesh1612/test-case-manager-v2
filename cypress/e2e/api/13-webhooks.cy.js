@@ -94,6 +94,54 @@ describe('API: /webhooks/*', () => {
     });
   });
 
+  // Audit B4 — SSRF structural guard. The Zod schema refuses non-http(s)
+  // schemes (file://, javascript:, gopher://, ftp://) and any literal
+  // IP that falls in the private/reserved range. DNS-rebinding is
+  // covered by the delivery-time check (assertUrlSafeAtDelivery); here
+  // we just lock down the registration-time path.
+  it('rejects non-http(s) webhook URLs (file://, javascript:, ftp://)', () => {
+    const bad = [
+      'file:///etc/passwd',
+      'javascript:alert(1)',
+      'ftp://example.com/hook',
+      'gopher://example.com/',
+    ];
+    cy.wrap(bad).each((badUrl) => {
+      cy.request({
+        method: 'POST',
+        url: '/webhooks',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: { url: badUrl },
+        failOnStatusCode: false,
+      }).then((resp) => {
+        expect(resp.status, `URL ${badUrl} should have been rejected`).to.eq(400);
+      });
+    });
+  });
+
+  it('rejects webhook URLs that point at literal private/reserved IPs', () => {
+    const bad = [
+      'http://10.0.0.1/hook',
+      'http://192.168.1.1/hook',
+      'http://172.16.0.1/hook',
+      'http://127.0.0.1/hook',
+      'http://169.254.169.254/hook',
+      'http://[::1]/hook',
+      'http://[fe80::1]/hook',
+    ];
+    cy.wrap(bad).each((badUrl) => {
+      cy.request({
+        method: 'POST',
+        url: '/webhooks',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: { url: badUrl },
+        failOnStatusCode: false,
+      }).then((resp) => {
+        expect(resp.status, `URL ${badUrl} should have been rejected`).to.eq(400);
+      });
+    });
+  });
+
   it('creates, lists, updates, and deletes a webhook', () => {
     let webhookId;
     cy.request({
