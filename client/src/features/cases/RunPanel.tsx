@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/hooks/useAuth';
+import { http } from '@/lib/http';
 import { showToast } from '@/lib/toast';
 
 import { useExecuteCase, useRunStream } from '../runs/hooks';
@@ -178,18 +179,14 @@ export function RunPanel({ caseData }: RunPanelProps) {
     if (!canExecute) return;
     setSavingSnippet(true);
     try {
-      const res = await fetch(`/test-cases/${caseData.id}`, {
-        method: 'PUT',
-        headers: {
-          'content-type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('tcm_token') ?? ''}`,
-        },
-        body: JSON.stringify({ executable_snippet: snippet.trim() || null }),
+      // Audit D (consistency): use the shared axios instance so the
+      // Bearer header, baseURL, and 401-redirect interceptor all apply
+      // here too. Previously this used raw fetch() with a manually-
+      // attached token, which bypassed the http client's token refresh
+      // / error normalization.
+      await http.put(`/test-cases/${caseData.id}`, {
+        executable_snippet: snippet.trim() || null,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Save failed (${res.status})`);
-      }
       showToast({ message: 'Snippet saved.', variant: 'success' });
     } catch (e) {
       showToast({ message: e instanceof Error ? e.message : 'Save failed', variant: 'error' });

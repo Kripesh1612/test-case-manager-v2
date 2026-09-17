@@ -46,7 +46,11 @@ http.interceptors.response.use(
       const onPublicAuthPage =
         path === '/login' || path === '/register' || path === '/invite-redeem';
       const url = err.config?.url ?? '';
-      const isMeCall = url === '/auth/me' || url === '/api/auth/me';
+      // axios baseURL is empty, so every request URL starts at the path
+      // itself (e.g. '/auth/me'). The /api/ prefix was a relic from an
+      // earlier nginx config; no client code emits it. Keep only the
+      // bare-path check.
+      const isMeCall = url === '/auth/me';
       if (!onPublicAuthPage && !isMeCall) {
         localStorage.removeItem(TOKEN_KEY);
         (window as unknown as { __redirectedToLogin?: boolean }).__redirectedToLogin = true;
