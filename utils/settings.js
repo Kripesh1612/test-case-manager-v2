@@ -24,8 +24,6 @@ const VALID_REGISTRATION_MODES = ['open', 'invite'];
 // extend via JWT_EXPIRES_IN (any string accepted by jsonwebtoken:
 // '7d', '12h', etc.) — see utils/auth.js.
 
-// --- JWT ---
-
 const getJwtSecret = () => process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
 const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '24h';
 
