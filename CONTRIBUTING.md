@@ -16,8 +16,8 @@ npm run docker:up        # Postgres + app on :3001 (first build pulls the
 
 Or the bare-metal path — see the [README](./README.md#quick-start).
 
-The suite is **388 tests**: 256 Cypress (154 API + 96 UI + 6
-advanced-patterns) across `cypress/e2e/`, plus 132 Node `node:test` unit
+The suite is **415 tests**: 263 Cypress (161 API + 96 UI + 6
+advanced-patterns) across `cypress/e2e/`, plus 152 Node `node:test` unit
 cases in `utils/*.test.js` and `middleware/*.test.js`.
 
 ## The four rules

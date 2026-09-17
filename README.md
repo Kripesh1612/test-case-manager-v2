@@ -4,7 +4,7 @@
 >
 > A self-contained test management platform: REST API, React UI, real Cypress
 > execution, flakiness scoring, version history, scheduler, RBAC, audit log,
-> and a 408-test suite (256 Cypress + 152 Node `node:test` unit) that
+> and a 415-test suite (263 Cypress + 152 Node `node:test` unit) that
 > documents itself.
 
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -51,7 +51,7 @@ both a usable tool and a learning resource:
 - Every **cross-cutting mechanism** (audit, soft delete, version history,
   flakiness, scheduler, real execution) lives in its own module and its own
   doc, so the codebase reads top-to-bottom.
-- The **test suite doubles as documentation**: 154 API contract tests, 96 UI
+- The **test suite doubles as documentation**: 161 API contract tests, 96 UI
   end-to-end tests, 6 cross-cutting Cypress specs, 152 Node `node:test`
   unit tests, plus a Postman collection — together they cover every happy
   path and most of the unhappy ones.
@@ -97,7 +97,7 @@ doc is the 5-minute tour.
 
 ### Quality
 
-- **408 tests** total — 256 Cypress (154 API + 96 UI + 6 shared) and 152
+- **415 tests** total — 263 Cypress (161 API + 96 UI + 6 shared) and 152
   Node `node:test` unit cases — all green in CI.
 - **Zod schemas shared** between client and server (single source of truth for input validation).
 - **Strict TypeScript** on the client (no `any` in the feature code).
@@ -161,7 +161,7 @@ the project stays clone-and-run.
 
    ┌────────────────────┐    ┌────────────────────┐
    │  Cypress (CI)      │    │  Cypress (local)   │
-   │  256 Cypress / 152 │    │  cy:open / cy:run  │
+   │  263 Cypress / 152 │    │  cy:open / cy:run  │
    │  node:test unit    │    │                    │
    └────────────────────┘    └────────────────────┘
 ```

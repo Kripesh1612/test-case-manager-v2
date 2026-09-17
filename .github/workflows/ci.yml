@@ -4,7 +4,7 @@
 # order:
 #   1. Lint              — `npm run lint` (eslint on utils + middleware)
 #   2. Unit tests        — `npm run test:unit` (Node `node:test`, < 2 s)
-#   3. Cypress end-to-end — full 256-test suite against a Postgres service
+#   3. Cypress end-to-end — full 263-test suite against a Postgres service
 #
 # Cost: ~3–4 min per run on the GitHub-hosted ubuntu-latest runner. Free
 # for public repos; private repos get 2,000 min/month on the free tier.

@@ -126,7 +126,7 @@ Every row in the catalogue above is covered by a test:
   defence-in-depth surface — e.g. viewer role cannot see write controls
   even if the server accidentally let the request through.
 
-Total: **152 unit cases** + **256 Cypress tests** including the
+Total: **152 unit cases** + **263 Cypress tests** including the
 specific audit-batch closure tests. See [`docs/ci.md`](./ci.md) for
 how the suite runs in CI on every push.
 

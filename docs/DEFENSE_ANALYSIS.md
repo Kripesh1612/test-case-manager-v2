@@ -39,7 +39,7 @@ Regress is a full-stack test-management platform that covers the **complete** QA
 | Backend files | 1 entry (`index.js`) + 12 route files + 7 middleware + 13 utils + 6 Zod schemas |
 | Frontend files | React 19 SPA, 12 feature folders, 11 shared components, 8 hooks/lib |
 | Database | PostgreSQL 16 via Prisma 5; 8 models, 4 migrations |
-| Tests | 256 Cypress tests (154 API + 96 UI + 6 advanced-patterns) across 31 spec files; plus 152 Node `node:test` unit cases (408 total) |
+| Tests | 263 Cypress tests (161 API + 96 UI + 6 advanced-patterns) across 32 spec files; plus 152 Node `node:test` unit cases (415 total) |
 | Documentation | 18 docs/ markdown files, 2,786 lines, ~88 KB; plus 419-line README |
 | Container | Multi-stage Alpine Node 22, non-root user, healthcheck, `wait-for-postgres` |
 | CI | Single GitHub Actions workflow, 3–4 min on `ubuntu-latest` |
@@ -74,7 +74,7 @@ The motivation is not just to ship features but to ship a **learning resource**:
 4. Soft delete + audit + version history as first-class concerns, not afterthoughts.
 5. Real test execution (Phase 8) via Cypress spawn + SSE.
 6. In-process cron scheduler with optimistic-claim concurrency, retry, and backoff.
-7. 256-test Cypress suite covering contract + UI + advanced patterns (plus 152 unit = 408 total).
+7. 263-test Cypress suite covering contract + UI + advanced patterns (plus 152 unit = 415 total).
 8. Docker Compose stack with healthchecks; one-command startup.
 9. GitHub Actions CI on every push to `main` and every PR.
 10. 18 docs/ files totalling ~88 KB, plus a Postman collection with auto-register pre-request.
@@ -441,8 +441,8 @@ Each mechanism is implemented in its own module *and* has its own doc page — t
 
 ### 10.1 Suite composition
 
-- **31 spec files**, **256 Cypress tests** (154 API + 96 UI + 6 advanced-patterns), plus **152 Node `node:test` unit cases** = **408 total**.
-- Split: 154 API + 96 UI + 6 advanced-patterns.
+- **32 spec files**, **263 Cypress tests** (161 API + 96 UI + 6 advanced-patterns), plus **152 Node `node:test` unit cases** = **415 total**.
+- Split: 161 API + 96 UI + 6 advanced-patterns.
 - File naming: zero-padded `NN-feature.cy.js` mapping to the eight phases.
 
 ### 10.2 Cypress config (`cypress.config.js`)
@@ -662,7 +662,7 @@ The standout doc. It opens with a posture statement (`docs/production-hardening.
 1. **[RESOLVED] Mixed module syntax in `shared/schemas/flakiness.js`** — was a CJS `require('zod')` + ESM `export` mix. Now the file is pure ESM (`import { z } from 'zod'`, `export const …`) matching the other schemas in `shared/schemas/`.
 2. **[RESOLVED] Cron parser DOM/DOW star flags set inside `nextFire`, not `parseCron`** (`utils/cron.js`) — now stamped in `parseCron` (`_domIsStar`/`_dowIsStar` at `utils/cron.js:88-89`), so `matches` on any parsed expression behaves correctly.
 3. **[RESOLVED] Executor race on child `error` and `exit`** (`utils/executor.js`) — a `finished` guard flag now ensures `finalize()` runs exactly once regardless of which handler fires (`utils/executor.js:119-130`).
-4. **[RESOLVED] Test count badge slightly stale** — the static "N passing locally" badge has been replaced with a **live GitHub Actions CI badge**, and hardcoded test-count prose was reconciled to the suite total actually measured from a fresh Cypress run (256 Cypress + 152 unit = 408). See `docs/ci.md`.
+4. **[RESOLVED] Test count badge slightly stale** — the static "N passing locally" badge has been replaced with a **live GitHub Actions CI badge**, and hardcoded test-count prose was reconciled to the suite total actually measured from a fresh Cypress run (263 Cypress + 152 unit = 415). See `docs/ci.md`.
 
 ### 13.2 Documented-but-unimplemented
 
