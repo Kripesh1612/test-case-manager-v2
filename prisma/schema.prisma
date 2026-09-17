@@ -35,17 +35,32 @@ model Project {
 }
 
 // --- Email Digest Log ---
+//
+// The "status" column distinguishes successful deliveries from failures
+// so the admin UI can flag the latter without digging into the JSONB
+// summary. "error" carries the SMTP error text when status='failed'.
+// "period_start"/"period_end" were previously nested inside the summary
+// JSONB; surfacing them as first-class columns makes "digests for this
+// window" queries indexable.
 model DigestLog {
-  id         Int      @id @default(autoincrement())
-  project_id Int      @default(1)
-  sent_at    DateTime @default(now())
-  recipients Json     @db.JsonB   // ["user@example.com", ...]
-  summary    Json     @db.JsonB   // { cases_added: N, runs_failed: N, ... }
-  created_at DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  project_id   Int      @default(1)
+  sent_at      DateTime @default(now())
+  // 'sent' (default — SMTP/.eml wrote something) | 'failed' (delivery
+  // raised an exception) | 'skipped' (no-op slot, e.g. zero activity).
+  status       String   @default("sent")
+  error        String?
+  period_start DateTime?
+  period_end   DateTime?
+  recipients   Json     @db.JsonB   // ["user@example.com", ...]
+  summary      Json     @db.JsonB   // { cases_added: N, runs_failed: N, ... }
+  created_at   DateTime @default(now())
 
   project Project? @relation(fields: [project_id], references: [id])
 
   @@index([project_id])
+  @@index([project_id, sent_at])
+  @@index([status])
   @@map("digest_logs")
 }
 
@@ -96,6 +111,11 @@ model Webhook {
   project    Project  @relation(fields: [project_id], references: [id])
   deliveries WebhookDelivery[]
 
+  // Composite index for the list-webhooks query (`WHERE project_id = ?`).
+  // Composite UNIQUE on (project_id, url) prevents duplicate registrations
+  // of the same URL within a single project (audit B5).
+  @@index([project_id])
+  @@unique([project_id, url])
   @@map("webhooks")
 }
 
@@ -110,7 +130,11 @@ model WebhookDelivery {
   error      String?
   created_at DateTime @default(now())
 
+  // Single-column index on webhook_id matches the FK and covers
+  // count-by-webhook queries. The composite index below matches the
+  // deliveries-list query (`WHERE webhook_id = ? ORDER BY created_at DESC`).
   @@index([webhook_id])
+  @@index([webhook_id, created_at(sort: Desc)])
   @@map("webhook_deliveries")
 }
 
@@ -309,5 +333,7 @@ model ScheduledJob {
 
   @@index([enabled, next_run_at])
   @@index([enabled, retry_at])
+  // Project-scoping index for the list endpoint (audit B5).
+  @@index([project_id])
   @@map("scheduled_jobs")
 }
