@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const { validate, asyncHandler } = require('../middleware/http');
 const { registerSchema, loginSchema } = require('../shared/schemas/auth');
-const { hashPassword, generateToken } = require('../utils/auth');
+const { hashPassword, generateToken, timingSafeComparePassword } = require('../utils/auth');
 const { isAdminEmail } = require('../utils/adminEmails');
 const {
   getRateLimitLoginMax,
@@ -12,6 +12,7 @@ const { makeRateLimiter } = require('../utils/rateLimit');
 const requireAuth = require('../middleware/auth');
 const registrationGate = require('../middleware/registrationGate');
 const prisma = require('../db');
+const { withProjectName } = require('./projects');
 
 const router = express.Router();
 
@@ -62,13 +63,23 @@ router.post(
         password_hash,
         name: name || '',
         role,
+        // New accounts land in the default project. A different project is
+        // achievable via an invite (which carries its own project_id).
+        project_id: 1,
       },
     });
 
     const token = generateToken(user.id, user.role);
+    const enriched = await withProjectName({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      projectId: user.project_id,
+    });
 
     res.status(201).json({
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: enriched,
       token,
     });
   })
@@ -84,6 +95,12 @@ router.post(
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      // Audit C2: equalize timing with the happy path so an attacker
+      // can't enumerate emails by measuring response latency. The
+      // compare returns whatever it returns (the plaintext is
+      // throwaway) and we surface the same generic 401 as the wrong-
+      // password branch.
+      await timingSafeComparePassword(password);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -93,17 +110,25 @@ router.post(
     }
 
     const token = generateToken(user.id, user.role);
+    const enriched = await withProjectName({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      projectId: user.project_id,
+    });
 
     res.json({
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: enriched,
       token,
     });
   })
 );
 
 // ME — GET /auth/me (protected)
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', requireAuth, async (req, res) => {
+  const enriched = await withProjectName(req.user);
+  res.json({ user: enriched });
 });
 
 module.exports = router;

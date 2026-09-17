@@ -15,8 +15,8 @@ const { asyncHandler } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
-const { parseId } = require('../utils/params');
-const { NOT_DELETED } = require('../utils/scope');
+const { parseId, clampInt } = require('../utils/params');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -32,11 +32,6 @@ const ALLOWED_RUN_STATUS = ['not_run', 'running', 'passed', 'failed', 'errored']
 // so a router.use(requireAuth) would intercept unrelated paths like
 // /health.
 
-const clampInt = (raw, lo, hi, dflt) => {
-  const n = parseInt(raw, 10);
-  return Number.isInteger(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
-};
-
 // POST /test-cases/:id/runs — start a new run. Default status "not_run"
 // and started_at=now. Returns the run row.
 router.post(
@@ -47,7 +42,7 @@ router.post(
     const caseId = parseId(req.params.id);
     if (!caseId) return res.status(404).json({ error: 'Case not found' });
     const tc = await prisma.testCase.findFirst({
-      where: { id: caseId, ...NOT_DELETED },
+      where: { id: caseId, ...NOT_DELETED, ...projectScope(req.user) },
       select: { id: true },
     });
     if (!tc) return res.status(404).json({ error: 'Case not found' });
@@ -84,10 +79,38 @@ router.put(
       return res.status(400).json({ error: `status must be one of ${ALLOWED_RUN_STATUS.join(', ')}` });
     }
 
+    // Audit C (validation): started_at must parse to a real Date. An
+    // invalid value (e.g. 'yesterday') becomes `new Date('yesterday')`
+    // = Invalid Date, and Invalid Date - real Date = NaN, which would
+    // land as duration_ms = NaN in Postgres. Reject up front.
+    if (started_at != null) {
+      const d = new Date(started_at);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'started_at must be a valid date' });
+      }
+    }
+
     const existing = await prisma.testRun.findFirst({
-      where: { id: runId, test_case_id: caseId },
+      where: {
+        id: runId,
+        test_case_id: caseId,
+        test_case: { project_id: req.user.projectId },
+      },
     });
     if (!existing) return res.status(404).json({ error: 'Run not found' });
+
+    // Audit C (idempotency): a run that has already reached a terminal
+    // status shouldn't be silently overwritten — that would let a
+    // duplicated PUT from a flaky executor clobber the real result.
+    // Admins can opt-in to a force-rewrite with `?force=true`.
+    const TERMINAL_STATUSES = ['passed', 'failed', 'errored'];
+    const force = req.query.force === 'true' || req.query.force === '1';
+    if (!force && TERMINAL_STATUSES.includes(existing.status)) {
+      return res.status(409).json({
+        error: 'Run already finalized; pass ?force=true to overwrite',
+        status: existing.status,
+      });
+    }
 
     const data = {};
     if (status) data.status = status;
@@ -106,18 +129,17 @@ router.put(
       data.duration_ms = Math.max(0, data.finished_at.getTime() - startTs.getTime());
     }
 
-    const updated = await prisma.testRun.update({
-      where: { id: runId },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.testRun.update({ where: { id: runId }, data });
+      // Update the parent case's last_run_at so the dashboard can sort by it.
+      if (data.finished_at) {
+        await tx.testCase.update({
+          where: { id: caseId },
+          data: { last_run_at: data.finished_at },
+        });
+      }
+      return u;
     });
-
-    // Update the parent case's last_run_at so the dashboard can sort by it.
-    if (data.finished_at) {
-      await prisma.testCase.update({
-        where: { id: caseId },
-        data: { last_run_at: data.finished_at },
-      });
-    }
 
     res.json(updated);
   }, {
@@ -137,6 +159,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const caseId = parseId(req.params.id);
     if (!caseId) return res.status(404).json({ error: 'Case not found' });
+
+    // The case must live in the caller's project (even when deleted —
+    // trash preserves the row, runs outlive the case).
+    const tc = await prisma.testCase.findFirst({
+      where: { id: caseId, ...projectScope(req.user) },
+      select: { id: true },
+    });
+    if (!tc) return res.status(404).json({ error: 'Case not found' });
 
     const limit = clampInt(req.query.limit, 1, 200, 50);
     const runs = await prisma.testRun.findMany({
@@ -162,7 +192,7 @@ router.get(
     const since = new Date(Date.now() - days * 86400000);
 
     const runs = await prisma.testRun.findMany({
-      where: { started_at: { gte: since } },
+      where: { started_at: { gte: since }, test_case: { project_id: req.user.projectId } },
       orderBy: [{ started_at: 'desc' }, { id: 'desc' }],
       take: limit,
       include: {

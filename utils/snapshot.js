@@ -62,4 +62,31 @@ async function snapshotCase(caseId, createdById) {
   });
 }
 
-module.exports = { snapshotCase, toSnapshot, VERSIONED_FIELDS };
+// Audit C3 — version-with-tx variant. Routes that are already inside a
+// transaction (e.g. /versions/:id/restore) want the version-create to
+// participate in *their* transaction so the case update and the snapshot
+// either both commit or both roll back. Same algorithm as
+// snapshotCase, but driven off a caller-provided Prisma transaction
+// client (`tx`).
+async function snapshotCaseInTx(tx, caseId, createdById) {
+  const latest = await tx.testCaseVersion.findFirst({
+    where: { case_id: caseId },
+    orderBy: { version: 'desc' },
+    select: { version: true },
+  });
+  const nextVersion = (latest?.version ?? 0) + 1;
+
+  const tc = await tx.testCase.findUnique({ where: { id: caseId } });
+  if (!tc) throw new Error(`snapshotCaseInTx: case ${caseId} not found`);
+
+  return tx.testCaseVersion.create({
+    data: {
+      case_id: caseId,
+      version: nextVersion,
+      snapshot: toSnapshot(tc),
+      created_by_id: createdById ?? null,
+    },
+  });
+}
+
+module.exports = { snapshotCase, snapshotCaseInTx, toSnapshot, VERSIONED_FIELDS };

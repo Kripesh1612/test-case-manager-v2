@@ -5,6 +5,7 @@ const express = require('express');
 const { errorHandler } = require('./middleware/http');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const projectRoutes = require('./routes/projects');
 const testCaseRoutes = require('./routes/testCases');
 const testCaseVersionRoutes = require('./routes/versions');
 const testSuiteRoutes = require('./routes/testSuites');
@@ -14,7 +15,11 @@ const runRoutes = require('./routes/runs');
 const executionRoutes = require('./routes/execution');
 const inviteRoutes = require('./routes/invites');
 const scheduledJobRoutes = require('./routes/scheduledJobs');
+const webhookRoutes = require('./routes/webhooks');
+const digestRoutes = require('./routes/digest');
+const visualRoutes = require('./routes/visual');
 const { startScheduler, stopScheduler } = require('./middleware/schedulerLoop');
+const { startDigestLoop, stopDigestLoop } = require('./middleware/digestLoop');
 const { startTrashPurge, stopTrashPurge } = require('./utils/trashPurge');
 
 // Path to the Vite production build, when present (used to serve the
@@ -35,6 +40,19 @@ app.set('trust proxy', parseInt(process.env.TRUST_PROXY ?? '1', 10) || 1);
 // OOM attempts. Override via JSON_BODY_LIMIT env if you need to.
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 
+// Audit C (CSRF): enforce an Origin/Referer allowlist on all state-
+// changing requests (POST/PUT/PATCH/DELETE). Bearer-token auth already
+// forecloses classic form-based CSRF, but a defense-in-depth origin
+// check costs nothing and constrains the damage radius of a stolen
+// token. See middleware/csrf.js for the full rationale. Mounted here
+// (before all routers) so every write endpoint is covered.
+//
+// Trust the same-host origin by default. CI / programmatic callers
+// can opt out via CSRF_ALLOW_NO_ORIGIN=1 (rare — almost always means
+// something's wrong). Production should never set CSRF_ALLOWED_ORIGINS=*
+// outside of integration tests.
+app.use(require('./middleware/csrf').csrfGuard());
+
 // Serve the simple UI from /public
 app.use(express.static('public'));
 
@@ -45,6 +63,8 @@ app.use('/assets', express.static(path.join(clientDistDir, 'assets')));
 // Mount routers
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+// Project management (Feature 4) — admin-only CRUD + the project switcher.
+app.use('/projects', projectRoutes);
 // Flakiness routes own the literal /test-cases/flaky path. Mounted
 // BEFORE testCaseRoutes because testCaseRoutes has a `/:id` handler
 // that would otherwise 404 on caseId="flaky".
@@ -66,6 +86,12 @@ app.use(runRoutes);
 // GET /runs/:id/stream. Both live at root because the SSE endpoint
 // isn't scoped under a particular case in the URL.
 app.use(executionRoutes);
+// Webhook management (Feature 1) — admin-only CRUD + delivery history.
+app.use('/webhooks', webhookRoutes);
+// Email digest (Feature 2) — admin-only history/send/preview.
+app.use('/digest', digestRoutes);
+// Visual regression artifacts (Feature 3) — screenshot upload/diff/serve.
+app.use(visualRoutes);
 
 // UI pages — serve the React app for the routes we've migrated, fall
 // back to the vanilla HTML files in public/ for the rest (so Cypress
@@ -93,6 +119,10 @@ app.get('/suites', serveReact);
 app.get('/suites/:id', serveReact);
 app.get('/scheduler', serveReact);
 app.get('/admin/audit', serveReact);
+app.get('/admin/webhooks', serveReact);
+app.get('/admin/digest', serveReact);
+app.get('/admin/projects', serveReact);
+app.get('/visual', serveReact);
 
 // API router — mounted AFTER the HTML page so it owns all the
 // /trash/cases, /trash/suites, etc. sub-paths but the bare /trash
@@ -120,6 +150,8 @@ app.listen(PORT, () => {
   // Hourly sweep that hard-deletes soft-deleted rows past their
   // TRASH_RETENTION_DAYS window. Disabled by TRASH_RETENTION_DAYS=0.
   startTrashPurge();
+  // Daily email digest (Feature 2) — opt-in via DIGEST_ENABLED=1.
+  startDigestLoop();
 });
 
 // Graceful shutdown — clear the tick interval and let in-flight
@@ -129,6 +161,7 @@ const shutdown = (signal) => {
   console.log(`\nReceived ${signal}, shutting down...`);
   stopScheduler();
   stopTrashPurge();
+  stopDigestLoop();
   process.exit(0);
 };
 process.on('SIGINT', () => shutdown('SIGINT'));

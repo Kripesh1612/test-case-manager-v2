@@ -4,7 +4,7 @@ const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { updateUserRoleSchema } = require('../shared/schemas/auth');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const prisma = require('../db');
 
 const router = express.Router();
@@ -13,14 +13,20 @@ const router = express.Router();
 router.use(requireAuth, requireRole('admin'));
 
 // LIST USERS — GET /users
+// Audit C (pagination): capped at 200 rows per call.
 router.get(
   '/',
   asyncHandler(async (req, res) => {
+    const limit = clampInt(req.query.limit, 1, 500, 200);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
     const users = await prisma.user.findMany({
+      where: { project_id: req.user.projectId },
       orderBy: { id: 'asc' },
-      select: { id: true, email: true, name: true, role: true, created_at: true },
+      select: { id: true, email: true, name: true, role: true, project_id: true, created_at: true },
+      take: limit,
+      skip: offset,
     });
-    res.json(users);
+    res.json({ count: users.length, limit, offset, users });
   })
 );
 
@@ -31,6 +37,10 @@ router.put(
   withAudit('user.role', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'User not found' });
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || target.project_id !== req.user.projectId) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     const { role } = req.body;
     if (id === req.user.id && role !== 'admin') {
       return res.status(400).json({ error: 'You cannot demote yourself out of admin' });
@@ -62,8 +72,27 @@ router.delete(
   withAudit('user.delete', async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(404).json({ error: 'User not found' });
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || target.project_id !== req.user.projectId) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (id === req.user.id) {
       return res.status(400).json({ error: 'You cannot delete yourself' });
+    }
+    // Audit C (RBAC): last-admin guard. Deleting every admin (including
+    // yourself via the self-delete check above doesn't help — you'd
+    // delete other admins first, then realize you're locked out). We
+    // refuse the deletion if the target is an admin and they're the
+    // last one in the project.
+    if (target.role === 'admin') {
+      const adminCount = await prisma.user.count({
+        where: { project_id: req.user.projectId, role: 'admin' },
+      });
+      if (adminCount <= 1) {
+        return res
+          .status(409)
+          .json({ error: 'Cannot delete the last admin in the project' });
+      }
     }
     await prisma.user.delete({ where: { id } });
     res.status(204).send();

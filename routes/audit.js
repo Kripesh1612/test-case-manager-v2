@@ -12,17 +12,13 @@ const express = require('express');
 const { asyncHandler } = require('../middleware/http');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
+const { clampInt } = require('../utils/params');
 const prisma = require('../db');
 
 const router = express.Router();
 
 // Everything under /audit is admin-only.
 router.use(requireAuth, requireRole('admin'));
-
-const clampInt = (raw, lo, hi, dflt) => {
-  const n = parseInt(raw, 10);
-  return Number.isInteger(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
-};
 
 // Normalize the metadata column. Jsonb on Postgres returns a parsed object;
 // the string branch is a safety net for any legacy row that might have
@@ -36,7 +32,9 @@ const normalizeMeta = (m) => {
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const where = {};
+    // Feature 4: the audit trail is tenant-scoped — an admin only ever sees
+    // events that happened inside their active project.
+    const where = { project_id: req.user.projectId };
     if (req.query.actor_id) where.actor_id = clampInt(req.query.actor_id, 1, 1e9, 1);
     if (req.query.target_type) where.target_type = String(req.query.target_type);
     if (req.query.target_id) where.target_id = clampInt(req.query.target_id, 1, 1e9, 1);
@@ -83,6 +81,7 @@ router.get(
   '/actions',
   asyncHandler(async (req, res) => {
     const rows = await prisma.auditEvent.findMany({
+      where: { project_id: req.user.projectId },
       distinct: ['action'],
       select: { action: true },
       orderBy: { action: 'asc' },

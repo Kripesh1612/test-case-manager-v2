@@ -5,7 +5,7 @@ const requireRole = require('../middleware/roles');
 const withAudit = require('../middleware/withAudit');
 const { webhookSchema, webhookUpdateSchema } = require('../shared/schemas/webhook');
 const { projectScope } = require('../utils/scope');
-const { parseId } = require('../utils/params');
+const { parseId, clampInt } = require('../utils/params');
 const { deliverToWebhook } = require('../utils/webhooks');
 const { encryptSecret, decryptSecret } = require('../utils/webhookSecret');
 const prisma = require('../db');
@@ -13,19 +13,29 @@ const prisma = require('../db');
 const router = express.Router();
 
 // LIST — GET /webhooks (admin only)
+// Audit C (pagination): capped at 200 rows per call.
 router.get(
   '/',
   requireAuth,
   requireRole('admin'),
   asyncHandler(async (req, res) => {
+    const limit = clampInt(req.query.limit, 1, 500, 200);
+    const offset = clampInt(req.query.offset, 0, 1e9, 0);
     const webhooks = await prisma.webhook.findMany({
       where: projectScope(req.user),
       include: {
         _count: { select: { deliveries: true } },
       },
       orderBy: { id: 'asc' },
+      take: limit,
+      skip: offset,
     });
-    res.json(webhooks.map((w) => serializeWebhook(w)));
+    res.json({
+      count: webhooks.length,
+      limit,
+      offset,
+      webhooks: webhooks.map((w) => serializeWebhook(w)),
+    });
   })
 );
 

@@ -34,7 +34,14 @@ export {
   registerSchema,
   loginSchema,
   updateUserRoleSchema,
+  inviteCreateSchema,
   ROLE_VALUES,
 } from './auth.js';
 
 export { scheduledJobSchema, scheduledJobUpdateSchema } from './scheduledJob.js';
+
+export {
+  webhookSchema,
+  webhookUpdateSchema,
+  WEBHOOK_EVENTS,
+} from './webhook.js';

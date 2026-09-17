@@ -13,6 +13,7 @@ const prisma = require('../db');
 
 const requireAuth = require('../middleware/auth');
 const { findFlakyCases, analyzeFlakinessForCase } = require('../utils/flakiness');
+const { NOT_DELETED, projectScope } = require('../utils/scope');
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ router.get('/flaky', requireAuth, async (req, res, next) => {
       }
       threshold = n;
     }
-    const result = await findFlakyCases(threshold);
+    const result = await findFlakyCases(threshold, req.user.projectId);
     res.json(result);
   } catch (e) {
     next(e);
@@ -56,7 +57,7 @@ router.get('/:caseId/flakiness', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid caseId' });
     }
     const tc = await prisma.testCase.findFirst({
-      where: { id: caseId, deleted_at: null },
+      where: { id: caseId, ...NOT_DELETED, ...projectScope(req.user) },
       select: { id: true },
     });
     if (!tc) return res.status(404).json({ error: 'Test case not found' });
