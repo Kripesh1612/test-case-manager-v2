@@ -13,6 +13,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Project — multi-tenant container ---
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  users          User[]
+  test_cases     TestCase[]
+  test_suites    TestSuite[]
+  scheduled_jobs ScheduledJob[]
+  webhooks       Webhook[]
+  digest_logs    DigestLog[]
+  invites        Invite[]          @relation("InvitesForProject")
+  audit_events   AuditEvent[]      @relation("AuditForProject")
+
+  @@map("projects")
+}
+
+// --- Email Digest Log ---
+model DigestLog {
+  id         Int      @id @default(autoincrement())
+  project_id Int      @default(1)
+  sent_at    DateTime @default(now())
+  recipients Json     @db.JsonB   // ["user@example.com", ...]
+  summary    Json     @db.JsonB   // { cases_added: N, runs_failed: N, ... }
+  created_at DateTime @default(now())
+
+  project Project? @relation(fields: [project_id], references: [id])
+
+  @@index([project_id])
+  @@map("digest_logs")
+}
+
 model TestCase {
   id                Int      @id @default(autoincrement())
   title             String
@@ -25,20 +61,57 @@ model TestCase {
   tags              Json      @default("[]") @db.JsonB
   executable_snippet String? // optional Cypress test body that /execute runs; null = doc-only case
   last_run_at       DateTime?
+  project_id        Int       @default(1)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
   deleted_at        DateTime? // soft-delete tombstone; NULL = live
-  // Editor ownership: NULL means "no recorded creator" (legacy rows or
-  // server-side seeds). PUT/DELETE require req.user.id === created_by_id
-  // unless the caller is an admin. See middleware/requireOwnership.js.
   created_by_id     Int?
   created_by        User?     @relation("CreatedTestCases", fields: [created_by_id], references: [id], onDelete: SetNull)
 
-  suites TestSuiteCase[]
-  runs   TestRun[]
-  versions TestCaseVersion[]
+  project   Project  @relation(fields: [project_id], references: [id])
+  suites    TestSuiteCase[]
+  runs      TestRun[]
+  versions  TestCaseVersion[]
 
   @@map("test_cases")
+}
+
+// --- Webhook feature ---
+
+model Webhook {
+  id         Int      @id @default(autoincrement())
+  url        String
+  secret     String   @default("")
+  event      String   @default("suite.run.completed")
+  enabled    Boolean  @default(true)
+  project_id Int      @default(1)
+  // Nullable FK to the admin who created the webhook. NULL for server-
+  // seeded rows or any row created by a path that didn't pass a user.
+  // ON DELETE SET NULL matches the pattern used by TestCase.created_by_id.
+  created_by_id Int?
+  created_by    User?  @relation("CreatedWebhooks", fields: [created_by_id], references: [id], onDelete: SetNull)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  project    Project  @relation(fields: [project_id], references: [id])
+  deliveries WebhookDelivery[]
+
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id         Int      @id @default(autoincrement())
+  webhook_id Int
+  webhook    Webhook  @relation(fields: [webhook_id], references: [id], onDelete: Cascade)
+  event      String
+  payload    Json     @db.JsonB
+  status_code Int?
+  success    Boolean  @default(false)
+  error      String?
+  created_at DateTime @default(now())
+
+  @@index([webhook_id])
+  @@map("webhook_deliveries")
 }
 
 // Immutable snapshot of a TestCase's user-editable fields. Append-only:
@@ -71,12 +144,14 @@ model TestSuite {
   id          Int      @id @default(autoincrement())
   name        String
   description String   @default("")
+  project_id  Int      @default(1)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
   deleted_at  DateTime? // soft-delete tombstone; NULL = live
 
   cases TestSuiteCase[]
   scheduled_jobs ScheduledJob[]
+  project Project @relation(fields: [project_id], references: [id])
 
   @@map("test_suites")
 }
@@ -99,14 +174,17 @@ model User {
   password_hash String
   name          String   @default("")
   role          String   @default("editor") // admin | editor | viewer
+  project_id    Int      @default(1)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  invites         Invite[]     @relation("CreatedInvites")
-  runs            TestRun[]    @relation("RunsPerformed")
-  audit_actor     AuditEvent[] @relation("AuditActor")
-  scheduled_jobs  ScheduledJob[] @relation("CreatedScheduledJobs")
-  test_cases      TestCase[]   @relation("CreatedTestCases")
+  project        Project       @relation(fields: [project_id], references: [id])
+  invites        Invite[]      @relation("CreatedInvites")
+  runs           TestRun[]     @relation("RunsPerformed")
+  audit_actor    AuditEvent[]  @relation("AuditActor")
+  scheduled_jobs ScheduledJob[] @relation("CreatedScheduledJobs")
+  test_cases     TestCase[]    @relation("CreatedTestCases")
+  webhooks       Webhook[]     @relation("CreatedWebhooks")
 
   @@map("users")
 }
@@ -127,9 +205,12 @@ model Invite {
   accepted_at   DateTime?
   created_by_id Int
   created_by    User      @relation("CreatedInvites", fields: [created_by_id], references: [id])
+  project_id    Int       @default(1)
+  project       Project   @relation("InvitesForProject", fields: [project_id], references: [id])
   created_at    DateTime  @default(now())
 
   @@index([email])
+  @@index([project_id])
   @@map("invites")
 }
 
@@ -157,6 +238,12 @@ model TestRun {
   exit_code      Int?      // Cypress process exit code (0 = clean)
   started_via    String?   @default("manual") // 'manual' | 'scheduled' | 'api' — origin of the run
 
+  // Visual regression — screenshots captured during execution and pixeldiff.
+  screenshot_before String?  // path to baseline screenshot (artifact name)
+  screenshot_after  String?  // path to current run screenshot
+  diff_image        String?  // path to pixel-diff image
+  diff_score        Float?   // 0.0 = identical, 1.0 = completely different
+
   @@index([test_case_id])
   @@index([started_at])
   @@map("test_runs")
@@ -174,11 +261,14 @@ model AuditEvent {
   ip          String?
   user_agent  String?
   metadata    Json?     @db.JsonB              // { fields, before, after, ... }
+  project_id  Int       @default(1)
+  project     Project   @relation("AuditForProject", fields: [project_id], references: [id])
   created_at  DateTime @default(now())
 
   @@index([actor_id])
   @@index([target_type, target_id])
   @@index([created_at])
+  @@index([project_id])
   @@map("audit_events")
 }
 
@@ -201,6 +291,7 @@ model ScheduledJob {
   cron          String    // standard 5-field cron: "minute hour dom month dow"
   timezone      String    @default("UTC")
   suite_id      Int
+  project_id    Int       @default(1)
   suite         TestSuite @relation(fields: [suite_id], references: [id], onDelete: Cascade)
   enabled       Boolean   @default(true)
   last_run_at   DateTime?
@@ -213,6 +304,8 @@ model ScheduledJob {
   created_by    User      @relation("CreatedScheduledJobs", fields: [created_by_id], references: [id])
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id])
 
   @@index([enabled, next_run_at])
   @@index([enabled, retry_at])
