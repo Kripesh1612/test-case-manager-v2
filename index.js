@@ -166,3 +166,17 @@ const shutdown = (signal) => {
 };
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Tier1-PR-2. Catch-all handlers for promises/throws the route stack
+// never saw. Without these, Node 15+ leaves a dangling unhandled
+// rejection that crashes the process on next tick — both worse than
+// a structured log + graceful shutdown. Log, stop the background
+// loops, and exit non-zero so the orchestrator can restart us.
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection:', reason);
+  shutdown('unhandledRejection');
+});
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException:', err);
+  shutdown('uncaughtException');
+});
