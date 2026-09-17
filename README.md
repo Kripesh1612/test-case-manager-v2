@@ -235,8 +235,8 @@ this works.
 | `REGISTRATION_MODE` | `open` | `open` allows anyone to register; `invite` requires a valid invite token (admin-issued). |
 | `INVITE_TTL_DAYS` | `7` | Invite-token validity in days. |
 | `TRASH_RETENTION_DAYS` | `30` | Days before soft-deleted items are auto-purged. `0` disables purging. |
-| `RATE_LIMIT_LOGIN_MAX` | `200` | Login attempts per IP per 60s. Tighten for production. |
-| `RATE_LIMIT_REGISTER_MAX` | `200` | Register attempts per IP per 60s. Tighten for production. |
+| `RATE_LIMIT_LOGIN_MAX` | `10` | Login attempts per IP per 60s (production-strict default). Set `RATE_LIMIT_BURST=1` to relax to `200` for the Cypress suite. |
+| `RATE_LIMIT_REGISTER_MAX` | `3` | Register attempts per IP per 60s (production-strict default). Set `RATE_LIMIT_BURST=1` to relax to `200` for the Cypress suite. |
 | `AUDIT_ENABLED` | `true` | Toggle the audit log off in high-throughput test environments. |
 
 See [`utils/settings.js`](./utils/settings.js) for the canonical list and defaults.
