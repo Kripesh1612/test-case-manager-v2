@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Webhooks (Feature 1).** Signed HTTP notifications on suite-run
+  completion: `utils/webhooks.js` (HMAC-SHA256 signature, retries, timeout),
+  `routes/webhooks.js` (admin-only CRUD, test ping, delivery history),
+  admin UI at `/admin/webhooks`, and `Webhook` / `WebhookDelivery` models
+  (migration `20260909000000_add_projects_webhooks_digest_visual`).
+  Emission is fire-and-forget from `routes/testSuites.js` and the scheduler
+  loop. Docs: `docs/webhooks.md`.
+- **Email digest (Feature 2).** Scheduled project-activity summary:
+  `utils/digest.js` (compose + persist + deliver via SMTP or `.eml`
+  artifact), `middleware/digestLoop.js` (idempotent cron-ish loop,
+  `DIGEST_ENABLED` opt-in), `routes/digest.js` (admin history/send/preview),
+  admin UI at `/admin/digest`, and `DigestLog.project_id` for project
+  scoping (migration `20260909090000_digest_logs_project`). Docs:
+  `docs/digest.md`.
+- **Visual regression (Feature 3).** Pixel diffing for runs that capture
+  screenshots: `utils/visualDiff.js` (`pngjs` + `pixelmatch` resize/compare/
+  verdict), `routes/visual.js` (artifact upload, `POST /runs/:id/visual/diff`,
+  `GET /runs/:id/visual`, artifact serving with path-traversal guard,
+  `GET /visual/runs`), executor wiring (`screenshotsFolder` +
+  `attachVisualResults` stamping `diff_score`/`diff_image` on the run row),
+  and the **Visual** page at `/visual` (before/after/diff viewer). Docs:
+  `docs/visual-regression.md`.
+- **Multi-tenant groundwork.** `Project` model + `project_id` (default 1,
+  FK → projects) on `User`, `TestCase`, `TestSuite`, `ScheduledJob`,
+  `Webhook`; `req.user.projectId` set by `middleware/auth.js` and
+  `projectScope(user)` helper in `utils/scope.js`. All rows backfilled to
+  the seeded default project. Full project scoping lands in Feature 4.
 - Audit log UI page at `/audit` (admin-only) with filter + pagination +
   before/after JSON diff. Surface lives at `client/src/features/audit/`.
 - `requireOwnership` middleware (`middleware/requireOwnership.js`) so that
@@ -33,9 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via env (default `1mb`) to bound memory pressure from hostile clients.
 - `.env.example` entries for `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_REGISTER_MAX`,
   `JSON_BODY_LIMIT`, `TRUST_PROXY`, `SCHEDULER_TICK_MS`, `SCHEDULER_DISABLED`.
-- `npm run test:unit` script — 80 `node:test` cases (utils/cron,
-  utils/flakiness, utils/diff, utils/executor, middleware/registrationGate)
-  running in under a second, ideal for fast local feedback.
+- `npm run test:unit` script — `node:test` cases for utils/cron,
+  utils/flakiness, utils/diff, utils/executor, utils/webhooks,
+  utils/webhookSecret, utils/digest, utils/visualDiff,
+  middleware/registrationGate, running in under a second, ideal for
+  fast local feedback.
 - `SECURITY.md` — supported-versions table and vulnerability disclosure
   policy.
 - `docs/adr/0001-result-vs-run-state-model.md` — capture of the
@@ -67,8 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - README test-count references reconciled to the suite total actually
-  measured from a fresh Cypress run: 218 Cypress (129 API + 83 UI + 6
-  advanced-patterns) + 80 `node:test` unit = 298 total. The static
+  measured from a fresh Cypress run: 256 Cypress (154 API + 96 UI + 6
+  advanced-patterns) + 132 `node:test` unit = 388 total. The static
   "N passing locally" badge was replaced with a **live GitHub Actions CI
   badge** so the count can't go stale again.
 - `executor` finalizes a run with a `finished` guard so that the
@@ -88,8 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Electron binary links against glibc and segfaults on musl, which made
   Phase 8 real-test execution fail at runtime. `HEALTHCHECK` `start-period`
   raised from 15s → 25s.
-- README test-count references reconciled: 218 Cypress (129 API + 83 UI +
-  6 shared) + 80 `node:test` unit = 298 total.
+- README test-count references reconciled: 256 Cypress (154 API + 96 UI +
+  6 shared) + 132 `node:test` unit = 388 total.
 - `middleware/softDelete.js` removed — it was unused by every route
   (which already use Prisma `NOT_DELETED` scope helpers directly) and
   actively bypassed by several callers.

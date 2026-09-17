@@ -16,8 +16,8 @@ npm run docker:up        # Postgres + app on :3001 (first build pulls the
 
 Or the bare-metal path — see the [README](./README.md#quick-start).
 
-The suite is **298 tests**: 218 Cypress (129 API + 83 UI + 6
-advanced-patterns) across `cypress/e2e/`, plus 80 Node `node:test` unit
+The suite is **388 tests**: 256 Cypress (154 API + 96 UI + 6
+advanced-patterns) across `cypress/e2e/`, plus 132 Node `node:test` unit
 cases in `utils/*.test.js` and `middleware/*.test.js`.
 
 ## The four rules
@@ -54,8 +54,8 @@ Run the fast ones first, then the full suite:
 
 ```bash
 npm run lint             # ESLint on utils/ + middleware/
-npm run test:unit        # Node node:test unit suite (80 cases, < 1 s)
-npm run cy:run           # full Cypress suite (218 tests, ~3 min)
+npm run test:unit        # Node node:test unit suite (132 cases, < 1 s)
+npm run cy:run           # full Cypress suite (256 tests, ~3 min)
 ```
 
 CI runs `npm ci` → `prisma migrate deploy` → `npm run lint` →
