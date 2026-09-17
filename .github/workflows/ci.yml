@@ -1,11 +1,13 @@
 # Test Case Manager — CI
 #
-# Runs the full Cypress suite (211 tests) on every push to main and on every
-# pull request. Boots a Postgres service container, applies migrations, starts
-# the app, then runs Cypress against it.
+# On every push to main and on every pull request, runs three gates in
+# order:
+#   1. Lint              — `npm run lint` (eslint on utils + middleware)
+#   2. Unit tests        — `npm run test:unit` (Node `node:test`, < 2 s)
+#   3. Cypress end-to-end — full 256-test suite against a Postgres service
 #
-# Cost: ~3–4 min per run on the GitHub-hosted ubuntu-latest runner. Free for
-# public repos; private repos get 2,000 min/month on the free tier.
+# Cost: ~3–4 min per run on the GitHub-hosted ubuntu-latest runner. Free
+# for public repos; private repos get 2,000 min/month on the free tier.
 #
 # Badges: once this is on main, the README badge
 #   [![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](...)
@@ -19,12 +21,15 @@ on:
   pull_request:
     branches: [main]
 
-# One job: lint-free, migrate, boot app, run cypress. We don't separate unit
-# tests / API tests / UI tests because the full suite is < 2 minutes — the
-# cost of parallelism isn't worth the complexity.
+# One job, three sequential gates. Lint and unit tests are cheap (~3 s
+# combined) so they run unconditionally before Cypress, which is what
+# we actually care about — they catch the cheap-to-detect classes of
+# problem (lint regressions, broken pure-function logic) without making
+# us wait for a full DB boot. The Cypress run is the slowest gate
+# (~2–3 min) so it stays last.
 jobs:
   cypress:
-    name: Cypress end-to-end
+    name: CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -73,6 +78,21 @@ jobs:
         # `prisma generate` against prisma/schema.prisma, producing the
         # native client binary for the Ubuntu runner.
         run: npm ci
+
+      - name: Lint
+        # Tier1-PR-4. Catches the cheap-to-detect classes of regression
+        # (unused vars, undefined refs, stylistic drift) before any test
+        # runs. Runs over `utils/` and `middleware/` — the two top-level
+        # source folders the server owns. Client-side TS is checked
+        # separately by the build step if/when added.
+        run: npm run lint
+
+      - name: Unit tests
+        # Tier1-PR-4. 152 Node `node:test` cases covering the pure-function
+        # layer (cron parser, flakiness math, bcrypt timing, JWT alg
+        # pinning, webhook signature, etc.). Runs without DB in < 2 s,
+        # so it can fail fast without paying the boot + migrate cost.
+        run: npm run test:unit
 
       - name: Apply Prisma migrations
         # `migrate deploy` is the non-interactive sibling of `migrate dev`:
