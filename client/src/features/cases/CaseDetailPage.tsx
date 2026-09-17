@@ -504,7 +504,7 @@ function Row({
   const I = (
     <span className="inline-flex items-center gap-1.5">
       {icon === 'title' && <Icon.Cases size={12} />}
-      {icon === 'description' && <Icon.Cases size={12} />}
+      {icon === 'description' && <Icon.Edit size={12} />}
       {icon === 'steps' && <Icon.Run size={12} />}
       {icon === 'expected' && <Icon.Check size={12} />}
       {icon === 'priority' && <Icon.Flaky size={12} />}

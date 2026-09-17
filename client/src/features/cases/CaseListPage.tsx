@@ -30,7 +30,6 @@ import { showToast } from '@/lib/toast';
 import type { CaseData } from './api';
 import {
   PRIORITY_VALUES,
-  RESULT_VALUES,
   STATUS_VALUES,
   type CaseCreateInput,
   type CaseUpdateInput,
@@ -646,11 +645,6 @@ export function CaseListPage() {
           onCancel={() => setPendingDelete(null)}
         />
       )}
-
-      {/* Defensive: keep RESULT_VALUES referenced so an unused-import
-          lint doesn't drop the constant — also exported from ./api for
-          any future sibling pages that need it. */}
-      {void RESULT_VALUES[0]}
     </div>
   );
 }

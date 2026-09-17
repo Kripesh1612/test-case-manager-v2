@@ -790,7 +790,7 @@ function humanizeCron(expr: string): string {
   if (/^\*\/\d+$/.test(m) && isWild(h) && isWild(dom) && isWild(mo) && isWild(dow)) {
     return `Every ${parseInt(m.slice(2), 10)} minutes`;
   }
-  if (/^\d+$/.test(m) && /^\d+$/.test(h) && isWild(dom) && isWild(mo) && /^1-5$/.test(dow)) {
+  if (/^\d+$/.test(m) && /^\d+$/.test(h) && isWild(dom) && isWild(mo) && /^[1-5]$/.test(dow)) {
     return `Weekdays at ${h12(h)}`;
   }
   if (/^\d+$/.test(m) && /^\d+$/.test(h) && isWild(dom) && isWild(mo) && isWild(dow)) {
