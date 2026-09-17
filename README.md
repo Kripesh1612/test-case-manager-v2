@@ -4,7 +4,7 @@
 >
 > A self-contained test management platform: REST API, React UI, real Cypress
 > execution, flakiness scoring, version history, scheduler, RBAC, audit log,
-> and a 388-test suite (256 Cypress + 132 Node `node:test` unit) that
+> and a 408-test suite (256 Cypress + 152 Node `node:test` unit) that
 > documents itself.
 
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -14,7 +14,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![CI](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/Kripesh1612/test-case-manager-v2/actions/workflows/ci.yml)
 
-> **Note:** The git history in this repo starts fresh — it has been locally pulled into a single-commit repo for review. The original development history is preserved in a private upstream.
+> Solo CS capstone project — a full-stack test management platform built
+> end-to-end as the work of a single author. Locally pulled, runnable from
+> a fresh clone via `npm run docker:up` in ~10 seconds.
 
 ---
 
@@ -50,7 +52,7 @@ both a usable tool and a learning resource:
   flakiness, scheduler, real execution) lives in its own module and its own
   doc, so the codebase reads top-to-bottom.
 - The **test suite doubles as documentation**: 154 API contract tests, 96 UI
-  end-to-end tests, 6 cross-cutting Cypress specs, 132 Node `node:test`
+  end-to-end tests, 6 cross-cutting Cypress specs, 152 Node `node:test`
   unit tests, plus a Postman collection — together they cover every happy
   path and most of the unhappy ones.
 
@@ -80,13 +82,22 @@ doc is the 5-minute tour.
 | 🧬 **Case version history** | Every create + update snapshots the case into an append-only history. Side-by-side **Myers diff** between any two revisions, with one-click restore. Badges + sidebar on the case detail page. |
 | 📊 **Flakiness detector** | 0–100 score + categorical verdict (`stable` / `possibly_flaky` / `flaky` / `very_flaky` / `broken`) per case, blended from three signals: recent-vs-baseline pass-rate disagreement, alternation rate, and a late-failure-after-streak signal. Badges in the list view, full report on the detail page, top-10 widget on the dashboard. |
 | ⏰ **Scheduler** | In-process cron loop fires suites on a schedule (e.g. *"run the smoke suite every weekday at 9am"*). Custom 100-LOC cron parser, optimistic-claim concurrency, retry policy with exponential backoff + jitter. Admin UI at `/scheduler`. |
-| 🚀 **Real test execution (Phase 8)** | Paste a Cypress snippet into a case, click **Run**, the server spawns a real headless Electron browser against your snippet and streams progress back over **Server-Sent Events**. Result persists as a normal `TestRun` so the flakiness detector gets real data — not human-clicked pass/fail. |
+| 🚀 **Real test execution** | Paste a Cypress snippet into a case, click **Run**, the server spawns a real headless Electron browser against your snippet and streams progress back over **Server-Sent Events**. Result persists as a normal `TestRun` so the flakiness detector gets real data — not human-clicked pass/fail. |
 | 🔁 **Regression split** | The dashboard's "Test reliability" widget separates **flaky tests** (alternation patterns that recover) from **recent regressions** (was passing, now consistently failing). Two different problems, two different sections. |
 | 📨 **Invites** | `REGISTRATION_MODE=invite` makes sign-up admin-controlled. The first account is always bootstrap; admins issue invite tokens that gate subsequent registrations. |
 
+### Integrations
+
+| | |
+|---|---|
+| 🏢 **Multi-tenant projects** | Every test case, run, invite, and audit event belongs to a project. Admins can create and switch projects from a top-bar picker — viewer/editor users see a read-only project chip. Server-side scoping via `utils/scope.js` ensures rows from one project never leak into another. |
+| 🔔 **Webhooks** | On suite / case completion, signed (HMAC-SHA256) HTTP `POST` notifications fan out to per-tenant URLs. SSRF-guarded URL validation, secret rotation, delivery history with one-click replay. Admin UI at `/admin/webhooks`. |
+| 📬 **Weekly digest** | Scheduled email digest summarising new flakiness, regressions, and pass-rate shifts since the previous send. Respects project membership — recipients see only their own project's rollup. Configurable cadence and recipient list. |
+| 🖼️ **Visual regression** | Cases that capture screenshots can be diffed before/after. Server-side pixel comparison with `pixelmatch` produces a 0..1 ratio and a verdict pill (`identical` / `minor` / `major`); highlights land in an artifact PNG. Browse all diffs at `/visual`. |
+
 ### Quality
 
-- **388 tests** total — 256 Cypress (154 API + 96 UI + 6 shared) and 132
+- **408 tests** total — 256 Cypress (154 API + 96 UI + 6 shared) and 152
   Node `node:test` unit cases — all green in CI.
 - **Zod schemas shared** between client and server (single source of truth for input validation).
 - **Strict TypeScript** on the client (no `any` in the feature code).
@@ -150,7 +161,7 @@ the project stays clone-and-run.
 
    ┌────────────────────┐    ┌────────────────────┐
    │  Cypress (CI)      │    │  Cypress (local)   │
-   │  256 Cypress / 132 │    │  cy:open / cy:run  │
+   │  256 Cypress / 152 │    │  cy:open / cy:run  │
    │  node:test unit    │    │                    │
    └────────────────────┘    └────────────────────┘
 ```
@@ -248,12 +259,12 @@ See [`utils/settings.js`](./utils/settings.js) for the canonical list and defaul
 ```bash
 npm run cy:open        # interactive Cypress runner
 npm run cy:run         # headless, full Cypress suite (256 tests, ~3 min)
-npm run test:unit      # Node unit suite (132 tests, < 1 s)
+npm run test:unit      # Node unit suite (152 tests, < 1 s)
 npm run cy:run:api     # 154 API-level contract tests only
 npm run cy:run:ui      # 96 UI-level end-to-end tests only
 ```
 
-All 388 tests should be green. If you want to understand them, walk through
+All 408 tests should be green. If you want to understand them, walk through
 [`docs/learning-path.md`](./docs/learning-path.md) for the recommended order,
 or read [`docs/cypress-patterns.md`](./docs/cypress-patterns.md) for a
 catalog of every pattern used.
@@ -284,7 +295,7 @@ under `cypress/e2e/api/`.
 | `POST` | `/test-cases/:id/versions/:vid/restore` | Restore from a version (admin/editor). |
 | `GET`  | `/test-cases/:id/flakiness` | Score + verdict + signals. |
 | `GET`  | `/test-cases/flaky?threshold=50` | Top-N flaky cases (dashboard widget). |
-| `POST` | `/test-cases/:id/execute` | Phase 8: start a real Cypress run. |
+| `POST` | `/test-cases/:id/execute` | Start a real Cypress run. |
 | `GET`  | `/runs/:id/stream` | SSE feed for an in-flight run. |
 | `GET`  | `/test-suites` / `/test-suites/:id` | Suite CRUD. |
 | `GET`  | `/scheduled-jobs` / `POST` / `PUT` / `DELETE` | Cron jobs. |
@@ -370,7 +381,7 @@ curriculum is in [`docs/learning-path.md`](./docs/learning-path.md).
 
 ## Roadmap
 
-Completed across the eight phases of development:
+Completed:
 
 - [x] Project setup + Express hello world
 - [x] CRUD endpoints (in-memory → SQLite + Prisma → Postgres)
@@ -385,17 +396,21 @@ Completed across the eight phases of development:
 - [x] Docs that read like a curriculum
 - [x] Docker + env config
 - [x] CI (GitHub Actions) — runs `npm run test` on every push
-- [x] React + Vite + TypeScript + Tailwind migration (Phase 5)
-- [x] Case version history + Myers diff (Phase 6) — [`docs/case-versions.md`](./docs/case-versions.md)
-- [x] Flakiness detector + regression split (Phase 7) — [`docs/flakiness.md`](./docs/flakiness.md)
-- [x] Real test execution via SSE (Phase 8) — [`docs/test-execution.md`](./docs/test-execution.md)
+- [x] React + Vite + TypeScript + Tailwind migration — [`docs/architecture.md`](./docs/architecture.md)
+- [x] Case version history + Myers diff — [`docs/case-versions.md`](./docs/case-versions.md)
+- [x] Flakiness detector + regression split — [`docs/flakiness.md`](./docs/flakiness.md)
+- [x] Real test execution via SSE — [`docs/test-execution.md`](./docs/test-execution.md)
+- [x] Multi-tenant projects — [`docs/production-hardening.md`](./docs/production-hardening.md) (RBAC scoping section)
+- [x] Signed webhook delivery with secret rotation + replay — [`docs/webhooks.md`](./docs/webhooks.md)
+- [x] Weekly activity digest with project-scoped recipients — [`docs/digest.md`](./docs/digest.md)
+- [x] Visual regression diffs for screenshot-bearing cases — [`docs/visual-regression.md`](./docs/visual-regression.md)
+- [x] Adversarial self-audit closing every finding — [`docs/security-model.md`](./docs/security-model.md)
 
-Next steps (intentionally left for future work):
+Possible next steps (intentionally left for future work):
 
-- [ ] Webhook notifications on suite run completion
-- [ ] Per-project isolation (multi-tenant)
-- [ ] Email digest for flakiness regressions
-- [ ] Visual regression diffs for screenshot-bearing cases
+- [ ] Background-job system (queue + worker) — currently relies on an in-process cron loop
+- [ ] OpenID / SSO
+- [ ] Per-case API tokens for CI integration
 
 ---
 

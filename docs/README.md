@@ -30,6 +30,8 @@ file in the codebase:
   compose (and what this project deliberately is *not*).
 - [`audit-log.md`](./audit-log.md) — actor / action / target timeline;
   `middleware/withAudit.js`.
+- [`security-model.md`](./security-model.md) — STRIDE threat catalogue
+  with every control mapped to a finding from the adversarial self-audit.
 - [`soft-delete.md`](./soft-delete.md) — recoverable deletes via
   `deleted_at` tombstone; `utils/scope.js#NOT_DELETED`.
 - [`case-versions.md`](./case-versions.md) — append-only version history,
@@ -40,15 +42,15 @@ file in the codebase:
   `utils/flakiness.js`.
 - [`scheduler.md`](./scheduler.md) — in-process cron, optimistic-claim
   concurrency; `middleware/schedulerLoop.js` + `utils/cron.js`.
-- [`test-execution.md`](./test-execution.md) — Phase 8: real Cypress run
-  via SSE; `utils/executor.js` + `routes/execution.js`.
+- [`test-execution.md`](./test-execution.md) — real Cypress run via SSE;
+  `utils/executor.js` + `routes/execution.js`.
 - [`invites.md`](./invites.md) — `REGISTRATION_MODE=invite` flow.
-- [`webhooks.md`](./webhooks.md) — Feature 1: signed HTTP notifications on
-  suite-run completion; `utils/webhooks.js` + `routes/webhooks.js`.
-- [`digest.md`](./digest.md) — Feature 2: scheduled email digest of project
-  activity; `utils/digest.js` + `middleware/digestLoop.js`.
-- [`visual-regression.md`](./visual-regression.md) — Feature 3: pixel diffs
-  for runs that capture screenshots; `utils/visualDiff.js` + `routes/visual.js`.
+- [`webhooks.md`](./webhooks.md) — signed HTTP notifications on suite-run
+  completion; `utils/webhooks.js` + `routes/webhooks.js`.
+- [`digest.md`](./digest.md) — scheduled email digest of project activity;
+  `utils/digest.js` + `middleware/digestLoop.js`.
+- [`visual-regression.md`](./visual-regression.md) — pixel diffs for runs
+  that capture screenshots; `utils/visualDiff.js` + `routes/visual.js`.
 
 ## Operations
 
