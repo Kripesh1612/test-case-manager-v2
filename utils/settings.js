@@ -24,7 +24,22 @@ const VALID_REGISTRATION_MODES = ['open', 'invite'];
 // extend via JWT_EXPIRES_IN (any string accepted by jsonwebtoken:
 // '7d', '12h', etc.) — see utils/auth.js.
 
-const getJwtSecret = () => process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+const getJwtSecret = () => {
+  const s = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+  // Tier1-PR-1: refuse to boot production under the placeholder secret.
+  // The fallback to DEFAULT_JWT_SECRET exists only so the dev experience
+  // works on a fresh clone without .env; if NODE_ENV=production, that
+  // fallback path is a critical misconfiguration (anyone reading the
+  // source can sign forged JWTs), so fail loudly at first read instead
+  // of serving traffic.
+  if (process.env.NODE_ENV === 'production' && s === DEFAULT_JWT_SECRET) {
+    throw new Error(
+      'JWT_SECRET is unset or still set to the dev placeholder in production. Refusing to boot. ' +
+      'Set JWT_SECRET to a 48+ byte random value before starting the server.'
+    );
+  }
+  return s;
+};
 const getJwtExpiresIn = () => process.env.JWT_EXPIRES_IN || '24h';
 
 // --- Admin emails ---
