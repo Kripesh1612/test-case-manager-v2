@@ -93,11 +93,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prop from the job row wrapper, switched Dashboard pills to the typed
   `StatusPill`/`PriorityPill`/`ResultPill` wrappers, and added `?? 'draft'`
   fallbacks where `c.status` is optional.
+- `shared/schemas/flakiness.js` no longer mixes CommonJS `require()` with
+  ESM `export` — the file now exports its schema as a plain CommonJS
+  module to match how every other schema in the directory is consumed.
+- Dead imports removed from `utils/executor.js` (`artifactPath`,
+  `removeArtifacts`) and `routes/flakiness.js` (`withAudit`).
+- `ScheduledJob.timezone` is now honoured (previously stored but ignored).
 
 ### Changed
 - README test-count references reconciled to the suite total actually
-  measured from a fresh Cypress run: 256 Cypress (154 API + 96 UI + 6
-  advanced-patterns) + 132 `node:test` unit = 388 total. The static
+  measured from a fresh Cypress run: 263 Cypress (161 API + 96 UI + 6
+  shared) + 152 `node:test` unit = 415 total. The static
   "N passing locally" badge was replaced with a **live GitHub Actions CI
   badge** so the count can't go stale again.
 - `executor` finalizes a run with a `finished` guard so that the
@@ -117,19 +123,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Electron binary links against glibc and segfaults on musl, which made
   Phase 8 real-test execution fail at runtime. `HEALTHCHECK` `start-period`
   raised from 15s → 25s.
-- README test-count references reconciled: 256 Cypress (154 API + 96 UI +
-  6 shared) + 132 `node:test` unit = 388 total.
 - `middleware/softDelete.js` removed — it was unused by every route
   (which already use Prisma `NOT_DELETED` scope helpers directly) and
   actively bypassed by several callers.
-
-### Fixed
-- `shared/schemas/flakiness.js` no longer mixes CommonJS `require()` with
-  ESM `export` — the file now exports its schema as a plain CommonJS
-  module to match how every other schema in the directory is consumed.
-- Dead imports removed from `utils/executor.js` (`artifactPath`,
-  `removeArtifacts`) and `routes/flakiness.js` (`withAudit`).
-- `ScheduledJob.timezone` is now honoured (previously stored but ignored).
 
 ## [1.0.0] — 2026-09-01
 
