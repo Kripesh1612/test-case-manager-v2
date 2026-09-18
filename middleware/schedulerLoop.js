@@ -169,6 +169,11 @@ const claimJob = async (job) => {
   // deliberately advance past `now` so a job that runs at 9:00:00 and
   // took 90 seconds to execute won't immediately re-fire at 9:01:30.
   // If the job has a timezone, honor it; otherwise stay in UTC.
+  //
+  // audit-driven-sweep (f7100ca): prior to this commit the loop used
+  // `nextFireFromExpr` regardless of `job.timezone`, so the stored
+  // tz column was cosmetic. Now non-UTC jobs fire on the wall-clock
+  // time in their zone; unknown zones throw at parse time.
   const nextRun = job.timezone && job.timezone !== 'UTC'
     ? nextFireFromExprInZone(job.cron, job.timezone, now)
     : nextFireFromExpr(job.cron, now);

@@ -17,6 +17,20 @@
 //     row commits, so a client doing request -> audit-query immediately
 //     after is guaranteed to see the event. (This trades a few ms of
 //     response latency for test determinism.)
+//
+// audit-batch-C: the deferred-send pattern was introduced when audit
+// redaction (`Audit C1` below) and audit-row-as-source-of-truth needed
+// to coexist deterministically with mutation handlers. Belt-and-braces:
+//   * `recordAudit` (line 39) wraps prisma.auditEvent.create in its
+//     own try/catch — failures are logged but never bubbled out.
+//   * The outer try around `await recordAudit({ ... })` (line 145)
+//     exists so a *synchronous* throw from recordAudit can't break
+//     `sendCaptured()`.
+//   * `process.on('unhandledRejection')` in `index.js` is the
+//     last-line backstop for any remaining async path that we don't
+//     await (none today, but the handler stays in place).
+// Net effect: a successful HTTP response is guaranteed to be sent
+// even if every audit write fails for the lifetime of the request.
 
 const prisma = require('../db');
 const { isAuditEnabled } = require('../utils/settings');

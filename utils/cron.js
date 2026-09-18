@@ -170,6 +170,12 @@ const isValid = (expr) => {
 
 // ---- Timezone support (IANA tz via Intl.DateTimeFormat) -----------------
 //
+// audit-driven-sweep (f7100ca): ScheduledJob.timezone was stored but
+// ignored — the loop used `nextFireFromExpr` regardless. Added
+// `nextFireFromExprInZone` (Intl.DateTimeFormat, no new dep) and made
+// the loop honour it when `job.timezone !== 'UTC'`. Unknown zones
+// throw, not silent UTC fallback.
+//
 // Cron's classical behavior is "fire when the wall clock in some zone
 // matches the expression". We default to UTC; callers can pass any
 // IANA timezone string (e.g. 'America/New_York', 'Asia/Kathmandu').
