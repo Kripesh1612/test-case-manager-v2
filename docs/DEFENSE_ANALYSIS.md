@@ -809,6 +809,32 @@ The standout doc. It opens with a posture statement (`docs/production-hardening.
 
 > A. Most of these are now in place: (1) `docs/adr/` with dated ADRs (`0001-result-vs-run-state-model.md`), (2) `SECURITY.md`, (3) a **live CI badge** in the README, and (4) an **OpenAPI spec generated from the shared Zod schemas** (`docs/openapi.json`, `scripts/generate-openapi.mjs`, browsable via `npm run openapi:serve`). Remaining production-SaaS items: more ADRs, an OpenAPI→client-code pipeline, and a live deployed demo.
 
+#### Tech-stack alternatives (Q19–Q22)
+
+These four are stack-rationale rather than implementation-decision — panel questions like "did you consider Fastify?" rather than "why optimistic-claim."
+
+**Q19. Why Express 5 over Fastify / Koa / Hono?**
+
+> A. Three reasons. (1) **Ecosystem depth.** Express's middleware catalogue (helmet, csurf-origin-equivalents, cors, multer-style body parsing, the dozens of audit/monitoring packages) is two generations ahead of Fastify's and well ahead of Honos. For a project where the audit spine is `middleware/withAudit.js`, the `req.user.projectId` middleware pattern matters more than throughput benchmarks. (2) **Predictable failure modes.** `req` and `res` are plain objects with well-known semantics; panic-mode debugging at 11pm under panel pressure benefits from a stack the panel can pattern-match. (3) **Express 5's async/await + Promise rejection propagation** (the post-4.x redesign) closes the original "unhandled rejection in middleware" hole without bringing in a new framework. Fastify is faster on benchmarks; for a CRUD-heavy workload where the DB dominates and the synchronous fan-out per request is ~3 middleware, the 2-3× request-per-second advantage of Fastify is below noise. `routes/*.js` and `middleware/*.js` would port cleanly if the project ever needed to.
+
+**Q20. Why Prisma over TypeORM / Drizzle / Kysely?**
+
+> A. Two reasons. (1) **Transaction ergonomics.** Prisma's `$transaction([…])` API reads like serial code; TypeORM's `EntityManager.transaction` callback requires the await chain to live inside a callback or a QueryRunner. For a project that lives or dies by transactional correctness (audit redaction + last-admin-guard + invite RBAC, all batch-C), "easy to write the bug-free version" beats "faster cold-path writes". (2) **The migration generator story.** `prisma migrate dev` produces SQL you can read and commit; the equivalent for TypeORM requires either a separate CLI configuration or running the auto-generated SQL through review. Drizzle and Kysely are faster and leaner but require every query author to write SQL strings by hand — that's a posture I would have to defend for every PR, not at the framework level. The escape hatch (raw `$queryRaw`) exists for the few cases where Prisma's query builder is awkward, and it gets used three times in this codebase (`utils/scope.js` for tenant-scope aggregation, plus 2 ad-hoc places).
+
+**Q21. Why TanStack Query over SWR / RTK Query / fetch-and-setState?**
+
+> A. Three reasons. (1) **`useQuery` + `useMutation` give the same mental model as `useEffect` + caching, without the boilerplate.** SWR is comparable for reads but has no first-class mutation lifecycle; RTK Query bundles a global store I don't need and forces every other state to live there to avoid inconsistency. (2) **The query-key-as-cache-key semantics let invalidations be local.** `qc.invalidateQueries(['auth', 'me'])` after login broadcasts to every component reading `['auth', 'me']` — there's no manual subscription plumbing. SWR requires you to call `mutate(key)` manually; RTK Query requires a `providesTags`/`invalidatesTags` declaration on every endpoint. (3) **Optimistic updates without ceremony.** `onMutate` / `onError` / `onSettled` is the right shape for the few screens that need it (case edit, invite accept). The codebase uses it twice in `CaseDetailPage.tsx`; no other library makes it shorter.
+
+**Q22. What would you redo with hindsight?**
+
+> A. Five items, ranked by what would change the most code:
+>
+> 1. **Start with the audit-findings doc.** Half the panel-prep work this project now has (`docs/audit-findings.md`, the security-model row "Closed by" column, the inline `// Audit X (topic)` markers) would have been free if I'd written the doc on day one. The insight isn't "find bugs" — it's "label them as you go and never have to re-derive the chain."
+> 2. **Use Drizzle for the two ad-hoc SQL surfaces.** `utils/scope.js`'s aggregation and the digest log query are pure SQL; their Prisma equivalents are `$queryRaw` strings that don't get autocompletion or type checking. Drizzle for those two files, Prisma for the rest, would split responsibilities cleanly. (PR-B's OpenAPI extension won't change this.)
+> 3. **Skip the optimistic-claim pattern, use `SELECT … FOR UPDATE SKIP LOCKED` directly.** The optimistic-claim approach is great for the kind of distributed-deploy question panel will ask; for a single-process deployment it's a precautionary pattern that adds one round-trip per claim. With hindsight I'd use the `FOR UPDATE SKIP LOCKED` raw-SQL path with a 5-LOC comment explaining the trade-off.
+> 4. **Pre-bake the typo-corrections PR.** Three of the q-typos caught in panel-prep ("JWT_EXPIRES_IN" vs `JWT_EXPIRES_IN`, `run-finish idempotency` vs `run-finish idempotence`, etc.) were corrected in `docs/` but not always propagated to inline comments. A pre-emptive `typo-and-style sweep` PR would have saved real time.
+> 5. **Skip OAuth/OIDC plans entirely in the writeup.** OAuth is in the future-work table but the panel consistently skips it as out-of-scope. Listing it as a "next step" without a real implementation plan makes the future-work section read as padded. A tighter §16 ("Forward-looking: scheduler→Bull+Redis, rate-limit→Redis, partition-by-month audit, S3 artifact backend") would have been more honest.
+
 ---
 
 ## 16. Future work
