@@ -1,4 +1,4 @@
-// RunPanel — Phase 8 UI companion to FlakinessPanel.
+// RunPanel — UI companion to FlakinessPanel.
 //
 // Mounted full-width above the case-detail body so it sits directly
 // under the header. Behaviour:
@@ -15,10 +15,25 @@
 // This component owns its own SSE subscription rather than handing an
 // `onEvent` callback up to the page; the panel's lifecycle is the same
 // as the run's lifecycle, so co-locating them is simpler.
+//
+// Tier4-PR-R. Pulled onto the design system:
+//   - outer <aside> uses rg-card border/bg/shadow.
+//   - inline SVG play / spinner icons → Icon.Run / Spinner.
+//   - raw <button> styling → <Button variant="brand|secondary">.
+//   - raw <textarea> with focus:border-blue-500 → rg-input.
+//   - paletteFor() helper + raw colour ramps → Pill tones
+//     (info / result-passed / result-failed / danger).
+//   - raw result box (border-emerald-200 / bg-emerald-50 / etc.) →
+//     Card tone="flush" wrapper + theme utility text.
+// All data-cy hooks preserved verbatim.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { Button, Spinner } from '@/components/Button';
+import { Card } from '@/components/Card';
+import { Icon } from '@/components/Icons';
+import { Pill, type PillTone } from '@/components/Pill';
 import { useAuth } from '@/hooks/useAuth';
 import { http } from '@/lib/http';
 import { showToast } from '@/lib/toast';
@@ -34,6 +49,48 @@ type UiStatus = 'idle' | 'running' | 'passed' | 'failed' | 'errored';
 
 const MAX_LOG_LINES = 80;
 const MAX_LOG_CHARS = 4 * 1024;
+
+const STATUS_TONE: Record<UiStatus, PillTone> = {
+  idle: 'neutral',
+  running: 'info',
+  passed: 'result-passed',
+  failed: 'result-failed',
+  errored: 'danger',
+};
+
+const RESULT_TONE: Record<'passed' | 'failed' | 'errored', PillTone> = {
+  passed: 'result-passed',
+  failed: 'result-failed',
+  errored: 'danger',
+};
+
+// Visual wrapper around Pill so the running badge can animate. When
+// status === 'running' we suppress Pill's static ::before dot via a
+// Tailwind arbitrary selector and render a single pulsing dot ourselves,
+// keeping the visual exactly what it was before this refactor.
+function StatusBadge({ status }: { status: UiStatus }) {
+  const isRunning = status === 'running';
+  return (
+    <span
+      data-cy="run-status"
+      data-status={status}
+      className="inline-flex items-center gap-1.5"
+    >
+      <Pill
+        tone={STATUS_TONE[status]}
+        className={isRunning ? '[&::before]:hidden' : ''}
+      >
+        {statusLabel(status)}
+      </Pill>
+      {isRunning && (
+        <span
+          aria-hidden
+          className="h-1.5 w-1.5 rounded-full bg-info animate-pulse"
+        />
+      )}
+    </span>
+  );
+}
 
 export function RunPanel({ caseData }: RunPanelProps) {
   const { user } = useAuth();
@@ -179,11 +236,10 @@ export function RunPanel({ caseData }: RunPanelProps) {
     if (!canExecute) return;
     setSavingSnippet(true);
     try {
-      // Audit D (consistency): use the shared axios instance so the
-      // Bearer header, baseURL, and 401-redirect interceptor all apply
-      // here too. Previously this used raw fetch() with a manually-
-      // attached token, which bypassed the http client's token refresh
-      // / error normalization.
+      // Use the shared axios instance so the Bearer header, baseURL,
+      // and 401-redirect interceptor all apply here too. Previously
+      // this used raw fetch() with a manually-attached token, which
+      // bypassed the http client's token refresh / error normalization.
       await http.put(`/test-cases/${caseData.id}`, {
         executable_snippet: snippet.trim() || null,
       });
@@ -195,89 +251,92 @@ export function RunPanel({ caseData }: RunPanelProps) {
     }
   }
 
-  const palette = paletteFor(status);
-
   return (
-    <aside data-cy="run-panel" className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <header className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+    <Card
+      data-cy="run-panel"
+      tone="default"
+      className="overflow-hidden"
+    >
+      <header className="flex items-center justify-between border-b border-border-soft px-5 py-3">
         <div className="flex items-center gap-2">
-          <svg className="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-          </svg>
-          <h3 className="text-sm font-semibold text-gray-900">Test execution</h3>
+          <Icon.Run size={14} className="text-text-tertiary" />
+          <h3 className="text-sm font-semibold text-text">Test execution</h3>
         </div>
-        <span
-          data-cy="run-status"
-          data-status={status}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${palette.bg} ${palette.text} ${palette.border}`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${palette.dot} ${status === 'running' ? 'animate-pulse' : ''}`} />
-          {statusLabel(status)}
-        </span>
+        <StatusBadge status={status} />
       </header>
 
       <div className="space-y-4 px-5 py-4">
         <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          <label
+            htmlFor="run-snippet-input"
+            className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-text-tertiary"
+          >
             Cypress snippet
           </label>
           <textarea
+            id="run-snippet-input"
             data-cy="run-snippet-input"
             value={snippet}
             onChange={(e) => setSnippet(e.target.value)}
             disabled={!canExecute || status === 'running'}
             rows={6}
             placeholder="it('logs in', () => { cy.visit('/login'); ... })"
-            className="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+            className="rg-input font-mono text-xs disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-text-tertiary"
           />
-          <p className="mt-1 text-[11px] text-gray-500">
-            Paste a Cypress test body. It runs against the local app server at <code className="rounded bg-gray-100 px-1 py-0.5 text-[10px]">/</code> via the bundled Electron browser.
+          <p className="mt-1 text-[11px] text-text-tertiary">
+            Paste a Cypress test body. It runs against the local app server at{' '}
+            <code className="rounded bg-surface-sunken px-1 py-0.5 text-[10px]">/</code>{' '}
+            via the bundled Electron browser.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="brand"
+            size="md"
             data-cy="run-btn"
             data-writable="true"
+            leftIcon={status === 'running' ? <Spinner size={14} /> : <Icon.Run size={14} />}
             onClick={startRun}
             disabled={!canExecute || status === 'running' || !snippet.trim()}
-            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-            </svg>
             {status === 'running' ? 'Running…' : 'Run'}
-          </button>
+          </Button>
           {canExecute && snippet !== (caseData.executable_snippet ?? '') && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               data-cy="run-snippet-save"
               onClick={saveSnippet}
               disabled={savingSnippet || status === 'running'}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              loading={savingSnippet}
             >
-              {savingSnippet ? 'Saving…' : 'Save snippet'}
-            </button>
+              Save snippet
+            </Button>
           )}
           {!canExecute && (
-            <span className="text-[11px] italic text-gray-500">
+            <span className="text-[11px] italic text-text-tertiary">
               Viewers cannot run tests. Ask an admin or editor to execute this case.
             </span>
           )}
         </div>
 
         {status === 'running' && (
-          <div data-cy="run-progress" className="space-y-1 rounded border border-blue-200 bg-blue-50 p-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-blue-800">
-              <svg className="h-3.5 w-3.5 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+          <div
+            data-cy="run-progress"
+            className="space-y-1 rounded border border-info-border bg-info-soft p-3"
+          >
+            <div className="flex items-center gap-2 text-xs font-medium text-info-text">
+              <Spinner size={14} />
               Running on the server…
             </div>
             {logTail && (
-              <pre data-cy="run-log" className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-white/70 p-2 font-mono text-[11px] leading-snug text-gray-700">
+              <pre
+                data-cy="run-log"
+                className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-elevated/70 p-2 font-mono text-[11px] leading-snug text-text-secondary"
+              >
                 {truncate(logTail)}
               </pre>
             )}
@@ -285,9 +344,20 @@ export function RunPanel({ caseData }: RunPanelProps) {
         )}
 
         {result && (
-          <div data-cy="run-result" className={`rounded border p-3 ${resultPalette(result.status)}`}>
+          <div
+            data-cy="run-result"
+            className={`rounded border p-3 ${
+              result.status === 'passed'
+                ? 'border-result-passed-soft bg-result-passed-soft/40 text-success-text'
+                : result.status === 'failed'
+                  ? 'border-result-failed-soft bg-result-failed-soft/40 text-danger-text'
+                  : 'border-danger-border bg-danger-soft/40 text-danger-text'
+            }`}
+          >
             <div className="flex items-center justify-between text-sm font-medium">
-              <span data-cy="run-result-status">{resultLabel(result.status)}</span>
+              <span data-cy="run-result-status">
+                <Pill tone={RESULT_TONE[result.status]}>{resultLabel(result.status)}</Pill>
+              </span>
               <span className="font-mono text-xs">
                 exit {result.exitCode ?? '?'}
               </span>
@@ -297,8 +367,11 @@ export function RunPanel({ caseData }: RunPanelProps) {
             </dl>
             {result.errorLog && (
               <details className="mt-2">
-                <summary className="cursor-pointer text-xs font-medium text-rose-900">Error log</summary>
-                <pre data-cy="run-result-error" className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-white/80 p-2 font-mono text-[11px] text-rose-900">
+                <summary className="cursor-pointer text-xs font-medium text-danger-text">Error log</summary>
+                <pre
+                  data-cy="run-result-error"
+                  className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-elevated/80 p-2 font-mono text-[11px] text-danger-text"
+                >
                   {result.errorLog}
                 </pre>
               </details>
@@ -306,7 +379,7 @@ export function RunPanel({ caseData }: RunPanelProps) {
           </div>
         )}
       </div>
-    </aside>
+    </Card>
   );
 }
 
@@ -331,29 +404,6 @@ function resultLabel(s: 'passed' | 'failed' | 'errored'): string {
     case 'passed': return '✓ Passed';
     case 'failed': return '✕ Failed';
     case 'errored': return '⚠ Errored';
-  }
-}
-
-function paletteFor(s: UiStatus) {
-  switch (s) {
-    case 'idle':
-      return { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', dot: 'bg-gray-400' };
-    case 'running':
-      return { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' };
-    case 'passed':
-      return { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' };
-    case 'failed':
-      return { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-200', dot: 'bg-red-500' };
-    case 'errored':
-      return { bg: 'bg-rose-50', text: 'text-rose-900', border: 'border-rose-300', dot: 'bg-rose-600' };
-  }
-}
-
-function resultPalette(s: 'passed' | 'failed' | 'errored') {
-  switch (s) {
-    case 'passed': return 'border-emerald-200 bg-emerald-50 text-emerald-900';
-    case 'failed': return 'border-red-200 bg-red-50 text-red-900';
-    case 'errored': return 'border-rose-300 bg-rose-50 text-rose-900';
   }
 }
 
