@@ -11,6 +11,11 @@
 // trash query (and the parent cases / suites query where relevant) so
 // the lists re-render without a manual refetch.
 //
+// Tier4-PR-R. The page was already largely on the design system (it
+// uses Button, Card, EmptyState, PageHeader, ConfirmModal, Icon,
+// SkeletonRows). The only tokenisation left was the header "Trashed N"
+// stat pill: `shadow-[var(--shadow-soft)]` is now `shadow-soft`, which
+// is the Tailwind v4 utility name the @theme block already exposes.
 // All existing data-cy hooks are preserved verbatim so the UI test
 // suite keeps passing without changes.
 // =============================================================================
@@ -92,7 +97,7 @@ export function TrashPage() {
         title="Trash"
         description="Soft-deleted items are kept here. Restore to bring them back, or purge to remove permanently."
         actions={
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 shadow-[var(--shadow-soft)]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 shadow-soft">
             <Icon.Trash size={14} />
             <span className="text-xs font-medium uppercase tracking-wider text-text-tertiary">
               Trashed
