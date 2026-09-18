@@ -42,11 +42,13 @@ const [
   { testSuiteSchema, testSuiteUpdateSchema },
   { registerSchema, loginSchema, updateUserRoleSchema },
   { scheduledJobSchema, scheduledJobUpdateSchema },
+  { webhookSchema, webhookUpdateSchema },
 ] = await Promise.all([
   import('../shared/schemas/testCase.js'),
   import('../shared/schemas/testSuite.js'),
   import('../shared/schemas/auth.js'),
   import('../shared/schemas/scheduledJob.js'),
+  import('../shared/schemas/webhook.js'),
 ]);
 
 const registry = new OpenAPIRegistry();
@@ -63,6 +65,8 @@ registry.register('LoginRequest', loginSchema);
 registry.register('UpdateUserRole', updateUserRoleSchema);
 registry.register('ScheduledJob', scheduledJobSchema);
 registry.register('ScheduledJobUpdate', scheduledJobUpdateSchema);
+registry.register('Webhook', webhookSchema);
+registry.register('WebhookUpdate', webhookUpdateSchema);
 
 // Auth + common error payloads (hand-authored, not shared-schema — they're
 // response shapes, not input-validation schemas).
@@ -133,6 +137,133 @@ registry.registerComponent('schemas', 'TestCaseDetail', {
     updated_at: { type: 'string', format: 'date-time' },
     created_by_id: { type: 'integer', nullable: true },
     flakiness: { type: 'object', nullable: true },
+  },
+});
+
+// Webhook view-model (the secret column is never echoed in plaintext;
+// `has_secret` is a boolean derived from the encrypted column's presence).
+registry.registerComponent('schemas', 'WebhookView', {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    url: { type: 'string', format: 'uri' },
+    event: { type: 'string' },
+    enabled: { type: 'boolean' },
+    project_id: { type: 'integer' },
+    created_by_id: { type: 'integer', nullable: true },
+    created_at: { type: 'string', format: 'date-time' },
+    updated_at: { type: 'string', format: 'date-time' },
+    has_secret: { type: 'boolean' },
+    delivery_count: { type: 'integer' },
+  },
+});
+
+registry.registerComponent('schemas', 'WebhookDelivery', {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    webhook_id: { type: 'integer' },
+    event: { type: 'string' },
+    payload: { type: 'object' },
+    status_code: { type: 'integer', nullable: true },
+    success: { type: 'boolean' },
+    error: { type: 'string', nullable: true },
+    created_at: { type: 'string', format: 'date-time' },
+  },
+});
+
+registry.registerComponent('schemas', 'Project', {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    name: { type: 'string' },
+    slug: { type: 'string' },
+    description: { type: 'string', nullable: true },
+    created_at: { type: 'string', format: 'date-time' },
+    members: { type: 'integer', description: 'User count in this project' },
+    test_cases: { type: 'integer' },
+    test_suites: { type: 'integer' },
+    scheduled_jobs: { type: 'integer' },
+    webhooks: { type: 'integer' },
+  },
+});
+
+registry.registerComponent('schemas', 'DigestLog', {
+  type: 'object',
+  properties: {
+    id: { type: 'integer' },
+    project_id: { type: 'integer' },
+    sent_at: { type: 'string', format: 'date-time' },
+    status: { type: 'string', enum: ['sent', 'failed', 'skipped'] },
+    error: { type: 'string', nullable: true },
+    period_start: { type: 'string', format: 'date-time', nullable: true },
+    period_end: { type: 'string', format: 'date-time', nullable: true },
+    recipients: { type: 'array', items: { type: 'string', format: 'email' } },
+    summary: {
+      type: 'object',
+      description: 'Per-section counts (new_cases, changed_cases, runs, failures, errors)',
+      additionalProperties: true,
+    },
+    created_at: { type: 'string', format: 'date-time' },
+  },
+});
+
+registry.registerComponent('schemas', 'DigestCompose', {
+  type: 'object',
+  description: 'Result of /digest/preview or /digest/send — the composed digest payload.',
+  properties: {
+    window_start: { type: 'string', format: 'date-time' },
+    window_end: { type: 'string', format: 'date-time' },
+    project_id: { type: 'integer' },
+    recipients: { type: 'array', items: { type: 'string', format: 'email' } },
+    title: { type: 'string' },
+    sections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          label: { type: 'string' },
+          count: { type: 'integer' },
+        },
+      },
+    },
+    html: { type: 'string', description: 'Pre-rendered HTML body', nullable: true },
+    log_id: { type: 'integer', nullable: true, description: 'Set on /digest/send only' },
+    delivery: {
+      type: 'object',
+      nullable: true,
+      description: 'Set on /digest/send only — SMTP delivery outcome',
+      properties: {
+        delivered: { type: 'boolean' },
+        artifact: { type: 'string', nullable: true },
+        error: { type: 'string', nullable: true },
+      },
+    },
+  },
+});
+
+registry.registerComponent('schemas', 'VisualRunSummary', {
+  type: 'object',
+  properties: {
+    run_id: { type: 'integer' },
+    case_id: { type: 'integer' },
+    case_title: { type: 'string', nullable: true, description: 'Set on /visual/runs only' },
+    status: { type: 'string', enum: ['not_run', 'running', 'passed', 'failed', 'errored'] },
+    finished_at: { type: 'string', format: 'date-time', nullable: true },
+    diff_score: { type: 'number', nullable: true, description: '0..1 pixel-diff ratio (0 = identical)' },
+    verdict: { type: 'string', nullable: true, description: 'Bucketed from diff_score (e.g. identical, near, diverged)' },
+    screenshot_before: { type: 'string', nullable: true },
+    screenshot_after: { type: 'string', nullable: true },
+    diff_image: { type: 'string', nullable: true },
+    urls: {
+      type: 'object',
+      properties: {
+        before: { type: 'string', nullable: true },
+        after: { type: 'string', nullable: true },
+        diff: { type: 'string', nullable: true },
+      },
+    },
   },
 });
 
@@ -734,6 +865,246 @@ registry.registerPath({
   responses: { 204: { description: 'Revoked' }, ...defaultResponses },
 });
 
+// ---- /projects (admin) ----
+registry.registerPath({
+  method: 'get',
+  path: '/projects',
+  summary: 'List projects with member + content counts',
+  description: 'Admin only. Tenancy boundary — every user, case, suite, job, webhook, digest, invite, and audit event belongs to exactly one project.',
+  tags: ['Projects'],
+  security: bearer,
+  responses: { 200: { description: 'Array of projects', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Project' } } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/projects',
+  summary: 'Create a project',
+  description: 'Admin only. Slug auto-derived from name when omitted; uniqueness enforced by DB constraint.',
+  tags: ['Projects'],
+  security: bearer,
+  request: { body: { content: { 'application/json': { schema: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 1, maxLength: 120 }, slug: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' }, description: { type: 'string', maxLength: 500 } } } } } } },
+  responses: {
+    201: { description: 'Created project', content: { 'application/json': { schema: { $ref: '#/components/schemas/Project' } } } },
+    400: { description: 'name/slug validation failed' },
+    409: { description: 'slug already taken' },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/projects/{id}',
+  summary: 'Rename / re-slug / update description',
+  description: 'Admin only.',
+  tags: ['Projects'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  request: { body: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, slug: { type: 'string' }, description: { type: 'string', nullable: true } } } } } } },
+  responses: {
+    200: { description: 'Updated project', content: { 'application/json': { schema: { $ref: '#/components/schemas/Project' } } } },
+    400: { description: 'Validation / nothing-to-update' },
+    409: { description: 'slug already taken' },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/projects/{id}/switch',
+  summary: 'Set the caller\'s active project',
+  description: 'Admin only. Updates the user\'s `project_id`; all subsequent requests are pinned to the new project via auth middleware.',
+  tags: ['Projects'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: {
+    200: { description: 'Updated user with new project_id', content: { 'application/json': { schema: { type: 'object', properties: { id: { type: 'integer' }, email: { type: 'string' }, role: { type: 'string' }, projectId: { type: 'integer' }, project_name: { type: 'string' } } } } } },
+    ...defaultResponses,
+  },
+});
+
+// ---- /webhooks (admin) ----
+registry.registerPath({
+  method: 'get',
+  path: '/webhooks',
+  summary: 'List webhook subscriptions',
+  description: 'Admin only. Project-scoped.',
+  tags: ['Webhooks'],
+  security: bearer,
+  parameters: [
+    { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 500, default: 200 } },
+    { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 } },
+  ],
+  responses: { 200: { description: 'Webhook list', content: { 'application/json': { schema: { type: 'object', properties: { count: { type: 'integer' }, limit: { type: 'integer' }, offset: { type: 'integer' }, webhooks: { type: 'array', items: { $ref: '#/components/schemas/WebhookView' } } } } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/webhooks',
+  summary: 'Create a webhook subscription',
+  description: 'Admin only. The `secret` is encrypted at rest (AES-256-GCM keyed off JWT_SECRET) before insert; plaintext only exists in the request handler scope.',
+  tags: ['Webhooks'],
+  security: bearer,
+  request: { body: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Webhook' } } } } },
+  responses: {
+    201: { description: 'Created webhook', content: { 'application/json': { schema: { $ref: '#/components/schemas/WebhookView' } } } },
+    400: { description: 'URL failed structural SSRF guard' },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/webhooks/{id}/test',
+  summary: 'Send a synthetic ping to a webhook',
+  description: 'Admin only. Returns the delivery outcome (success flag, attempt count, delivery row IDs).',
+  tags: ['Webhooks'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: {
+    200: { description: 'Ping result', content: { 'application/json': { schema: { type: 'object', properties: { ok: { type: 'boolean' }, attempts: { type: 'integer' }, delivery_ids: { type: 'array', items: { type: 'integer' } } } } } } },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/webhooks/{id}/deliveries',
+  summary: 'Recent deliveries for one webhook',
+  description: 'Admin only. Newest first, capped at 50 rows.',
+  tags: ['Webhooks'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: { 200: { description: 'Recent deliveries', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/WebhookDelivery' } } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/webhooks/{id}',
+  summary: 'Update a webhook',
+  description: 'Admin only. If a new `secret` is provided it is re-encrypted before update; empty string clears the secret.',
+  tags: ['Webhooks'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  request: { body: { content: { 'application/json': { schema: { $ref: '#/components/schemas/WebhookUpdate' } } } } },
+  responses: { 200: { description: 'Updated webhook', content: { 'application/json': { schema: { $ref: '#/components/schemas/WebhookView' } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/webhooks/{id}',
+  summary: 'Delete a webhook',
+  description: 'Admin only. Cascades to webhook_deliveries.',
+  tags: ['Webhooks'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: { 204: { description: 'Deleted' }, ...defaultResponses },
+});
+
+// ---- /digest (admin) ----
+registry.registerPath({
+  method: 'get',
+  path: '/digest',
+  summary: 'Recent digest history',
+  description: 'Admin only. Newest first, capped at 30 rows.',
+  tags: ['Digest'],
+  security: bearer,
+  responses: { 200: { description: 'Digest history', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/DigestLog' } } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/digest/send',
+  summary: 'Send a digest now',
+  description: 'Admin only. Composes, persists a digest_logs row, then attempts SMTP delivery (writes a .eml artifact when SMTP_HOST is unset).',
+  tags: ['Digest'],
+  security: bearer,
+  responses: {
+    201: { description: 'Composed + persisted + delivery attempted', content: { 'application/json': { schema: { $ref: '#/components/schemas/DigestCompose' } } } },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/digest/preview',
+  summary: 'Preview a digest without persisting',
+  description: 'Admin only. Returns the composed digest including the rendered HTML body.',
+  tags: ['Digest'],
+  security: bearer,
+  responses: { 200: { description: 'Composed digest', content: { 'application/json': { schema: { $ref: '#/components/schemas/DigestCompose' } } } }, ...defaultResponses },
+});
+
+// ---- /visual ----
+registry.registerPath({
+  method: 'post',
+  path: '/runs/{id}/artifacts/{name}',
+  summary: 'Attach a base64 PNG screenshot to a run',
+  description: 'Admin only. Writes under the run\'s artifact directory at `artifacts/<name>.png`. Name is restricted to [A-Za-z0-9._-]+ to refuse path traversal.',
+  tags: ['Visual'],
+  security: bearer,
+  parameters: [
+    { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+    { name: 'name', in: 'path', required: true, schema: { type: 'string', pattern: '^[A-Za-z0-9._-]+$' } },
+  ],
+  request: { body: { content: { 'application/json': { schema: { type: 'object', required: ['data'], properties: { data: { type: 'string', description: 'Base64-encoded PNG' } } } } } } },
+  responses: {
+    201: { description: 'Stored', content: { 'application/json': { schema: { type: 'object', properties: { ok: { type: 'boolean' }, name: { type: 'string' } } } } } },
+    400: { description: 'Bad name or empty body' },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/runs/{id}/visual/diff',
+  summary: 'Compute before/after pixel diff for a run',
+  description: 'Admin only. Reads screenshot_before / screenshot_after (or `artifacts/before.png` + `artifacts/after.png` as defaults), computes the pixel diff, stores `artifacts/diff.png`, and stamps `diff_score` + verdict on the TestRun row.',
+  tags: ['Visual'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: {
+    200: { description: 'Diff result', content: { 'application/json': { schema: { type: 'object', properties: { diff_score: { type: 'number' }, verdict: { type: 'string' }, screenshot_before: { type: 'string' }, screenshot_after: { type: 'string' }, diff_image: { type: 'string' } } } } } },
+    400: { description: 'Missing before/after screenshot' },
+    ...defaultResponses,
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/visual/runs',
+  summary: 'List runs that have a stored pixel diff',
+  description: 'Admin + editor. Newest first, capped at 50 rows.',
+  tags: ['Visual'],
+  security: bearer,
+  responses: { 200: { description: 'Visual runs', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/VisualRunSummary' } } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/runs/{id}/visual',
+  summary: 'Get the stored visual diff for a run',
+  description: 'Admin + editor. Reflects what\'s stored; does NOT recompute.',
+  tags: ['Visual'],
+  security: bearer,
+  parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+  responses: { 200: { description: 'Stored diff summary', content: { 'application/json': { schema: { $ref: '#/components/schemas/VisualRunSummary' } } } }, ...defaultResponses },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/runs/{id}/artifacts/{name}',
+  summary: 'Serve a stored artifact file',
+  description: 'Admin + editor. Resolves through artifactPath() which refuses path traversal.',
+  tags: ['Visual'],
+  security: bearer,
+  parameters: [
+    { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+    { name: 'name', in: 'path', required: true, schema: { type: 'string', description: 'Splat path under the run\'s artifact directory' } },
+  ],
+  responses: { 200: { description: 'Image bytes', content: { 'image/png': { schema: { type: 'string', format: 'binary' } } } }, 404: { description: 'Artifact not found' }, ...defaultResponses },
+});
+
 // ---- health (public) ----
 registry.registerPath({
   method: 'get',
@@ -755,7 +1126,7 @@ const document = generator.generateDocument({
     title: 'Regress — Test Case Manager API',
     version: '1.0.0',
     description:
-      'REST API for the Regress test-management platform: test cases, suites, runs, version history, flakiness, scheduled jobs, RBAC, audit log, soft-delete/trash, invites, and real Cypress execution.\n\n' +
+      'REST API for the Regress test-management platform: test cases, suites, runs, version history, flakiness, scheduled jobs, RBAC, audit log, soft-delete/trash, invites, multi-tenancy (projects), webhooks + HMAC-signed deliveries, email digest, and visual regression (before/after pixel diff with stored PNG artifacts).\n\n' +
       'Except where marked public (`/auth/*`, `/invites/redeem`, `/health`), every endpoint requires an `Authorization: Bearer <JWT>` header. Roles: `admin`, `editor`, `viewer`.',
   },
   servers: [
@@ -773,6 +1144,10 @@ const document = generator.generateDocument({
     { name: 'Trash', description: 'Soft-deleted resource recovery' },
     { name: 'Audit', description: 'Admin audit log' },
     { name: 'Invites', description: 'Invite-only registration' },
+    { name: 'Projects', description: 'Multi-tenant project management (admin)' },
+    { name: 'Webhooks', description: 'Webhook subscriptions + delivery history + ping (admin)' },
+    { name: 'Digest', description: 'Periodic email digest composer + sender (admin)' },
+    { name: 'Visual', description: 'Visual regression: pixel diff between before/after screenshots' },
     { name: 'System', description: 'Health' },
   ],
   components: {
