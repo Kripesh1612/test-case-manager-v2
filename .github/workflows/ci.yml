@@ -127,3 +127,86 @@ jobs:
           DATABASE_URL: postgresql://tcm:tcm@localhost:5432/tcm?schema=public
           JWT_SECRET: ci-secret-do-not-use-in-prod-1234567890
           ADMIN_EMAILS: cypress-admin@tcm.com
+
+  # Tier3-PR-M. The Postman collection is the second contract-style
+  # gate (Cypress covers the same surface from a different angle);
+  # this job gives the panel a "Postman runs in CI too" talking point
+  # without slowing the main gate. Separate job so it has its own
+  # postgres + server lifecycle — never competes with Cypress for
+  # port 3001.
+  newman:
+    name: Postman (newman)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tcm
+          POSTGRES_PASSWORD: tcm
+          POSTGRES_DB: tcm
+          POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tcm -d tcm"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://tcm:tcm@localhost:5432/tcm?schema=public
+      JWT_SECRET: ci-secret-do-not-use-in-prod-1234567890
+      ADMIN_EMAILS: cypress-admin@tcm.com
+      PORT: 3001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Start server
+        # Boot the API in the background. The wait-on step below
+        # blocks until /health is green, then newman runs against it.
+        run: |
+          node index.js &
+          echo $! > server.pid
+
+      - name: Wait for /health
+        # Polls until /health returns 200, then runs the collection.
+        # Fail-fast after 60 s so a stuck boot doesn't burn the budget.
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/health > /dev/null; then
+              echo "healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server failed to boot in 60s"; exit 1
+
+      - name: Run Postman collection
+        # Runs the full collection end-to-end. The collection's
+        # prerequest script auto-registers a fresh user, so a fresh
+        # DB is sufficient — no manual seed step.
+        run: npm run newman -- --bail
+
+      - name: Stop server
+        if: always()
+        # Tear down even on failure so the runner doesn't leak the
+        # background process across cancellations.
+        run: |
+          if [ -f server.pid ]; then
+            kill "$(cat server.pid)" 2>/dev/null || true
+          fi
