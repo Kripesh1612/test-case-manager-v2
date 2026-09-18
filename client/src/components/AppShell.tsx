@@ -50,23 +50,65 @@ const NAV: NavItem[] = [
 export function AppShell() {
   const { user, logout } = useAuth();
   const roleClass = user ? `role-${user.role}` : '';
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close the drawer on route change so a nav-click → navigate doesn't
+  // leave the drawer visually stuck open over the new page.
+  useEffect(() => setSidebarOpen(false), [location.pathname]);
+
+  // Escape-to-close + body-scroll-lock while the mobile drawer is open.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [sidebarOpen]);
+
   return (
     <div
       className={`min-h-screen flex ${roleClass}`}
       data-user-role={user?.role ?? ''}
     >
-      {/* Sidebar — hidden on small screens so the layout collapses to
-          just the topbar. We use `hidden md:flex` rather than a burger
-          menu because the sidebar is feature-complete (no secondary nav),
-          and the existing Cypress suite exercises it at desktop widths. */}
-      <aside className="hidden md:flex md:w-60 lg:w-64 flex-shrink-0 flex-col border-r border-border bg-surface/60 backdrop-blur-sm">
-        <div className="px-5 py-5 border-b border-border-soft">
-          <Link to="/" className="inline-flex">
-            <Logo />
-          </Link>
-          <div className="mt-1.5 text-xs text-text-tertiary pl-9">
-            Catch what changed before your users do.
+      {/* Sidebar — desktop: persistent column. Mobile (<md): hidden until
+          the burger toggles `sidebarOpen`; then renders as a slide-in
+          drawer over a backdrop. Same DOM, different positioning. */}
+      <aside
+        data-cy="app-sidebar"
+        className={[
+          'flex flex-col border-r border-border bg-surface/60 backdrop-blur-sm flex-shrink-0',
+          // Desktop: always visible as a column.
+          'md:flex md:w-60 lg:w-64 md:static',
+          // Mobile: hidden by default, fixed overlay when open.
+          sidebarOpen ? 'fixed inset-y-0 left-0 z-40 w-72 flex' : 'hidden',
+        ].join(' ')}
+      >
+        <div className="px-5 py-5 border-b border-border-soft flex items-center justify-between">
+          <div>
+            <Link to="/" className="inline-flex" onClick={() => setSidebarOpen(false)}>
+              <Logo />
+            </Link>
+            <div className="mt-1.5 text-xs text-text-tertiary pl-9">
+              Catch what changed before your users do.
+            </div>
           </div>
+          {/* Close button — only meaningful on mobile (md:hidden). */}
+          <button
+            type="button"
+            data-cy="sidebar-close"
+            aria-label="Close navigation"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-text-secondary hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-brand"
+          >
+            <Icon.X size={18} />
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
           {user && NAV.map((item) => {
@@ -78,6 +120,7 @@ export function AppShell() {
                 to={item.to}
                 data-cy={item.dataCy}
                 hidden={!visible}
+                onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
                   `rg-nav-item${isActive ? ' rg-nav-item-active active' : ''}`
                 }
@@ -101,9 +144,19 @@ export function AppShell() {
         </div>
       </aside>
 
+      {/* Backdrop — only on mobile when the drawer is open. Click to close. */}
+      {sidebarOpen && (
+        <div
+          data-cy="sidebar-backdrop"
+          aria-hidden
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-bg/60 backdrop-blur-sm md:hidden"
+        />
+      )}
+
       {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar user={user} onLogout={logout} />
+        <TopBar user={user} onLogout={logout} onOpenSidebar={() => setSidebarOpen(true)} />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8 max-w-[1400px] w-full mx-auto">
           <Outlet />
         </main>
@@ -115,13 +168,25 @@ export function AppShell() {
 function TopBar({
   user,
   onLogout,
+  onOpenSidebar,
 }: {
   user: { email: string; role: 'admin' | 'editor' | 'viewer'; project_name?: string | null; projectId?: number } | null;
   onLogout: () => void;
+  onOpenSidebar: () => void;
 }) {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10 border-b border-border bg-bg/80 backdrop-blur-md">
       <div className="flex items-center gap-3">
+        {/* Burger — only on mobile, since the sidebar is hidden below md. */}
+        <button
+          type="button"
+          data-cy="sidebar-toggle"
+          aria-label="Open navigation"
+          onClick={onOpenSidebar}
+          className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-brand"
+        >
+          <Icon.Menu size={20} />
+        </button>
         <MobileBrand />
         {/* Project badge — admin-only dropdown, read-only chip otherwise. */}
         <ProjectPicker user={user} />

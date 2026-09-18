@@ -110,6 +110,11 @@ export const Icon = {
       <path d="M6 6l12 12M18 6L6 18" />
     </svg>
   ),
+  Menu: (p: IconProps) => (
+    <svg {...base(p)} {...p}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  ),
   Logout: (p: IconProps) => (
     <svg {...base(p)} {...p}>
       <path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" />
