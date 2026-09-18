@@ -452,8 +452,7 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string",
-            "format": "email"
+            "type": "string"
           },
           "password": {
             "type": "string",
@@ -462,6 +461,7 @@
           },
           "name": {
             "type": "string",
+            "minLength": 1,
             "maxLength": 100
           }
         },
@@ -474,12 +474,12 @@
         "type": "object",
         "properties": {
           "email": {
-            "type": "string",
-            "format": "email"
+            "type": "string"
           },
           "password": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 100
           }
         },
         "required": [

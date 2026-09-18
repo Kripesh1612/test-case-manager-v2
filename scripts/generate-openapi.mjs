@@ -22,6 +22,15 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 
+// CLI override:
+//   node scripts/generate-openapi.mjs --out /tmp/openapi.fresh.json
+// is used by the stale-check CI step (`npm run openapi:check`) to write
+// the freshly-generated spec into a temp file and diff it against
+// docs/openapi.json without touching the committed copy.
+const cliArgs = process.argv.slice(2);
+const outArgIdx = cliArgs.indexOf('--out');
+const outOverride = outArgIdx >= 0 ? cliArgs[outArgIdx + 1] : null;
+
 // extendZodWithOpenApi must run BEFORE the shared schemas are imported —
 // it patches z.object()/z.enum() etc. with `.openapi()` metadata, and the
 // schema modules construct their schemas at import time. Load them via
@@ -774,7 +783,8 @@ const document = generator.generateDocument({
 });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outPath = resolve(__dirname, '..', 'docs', 'openapi.json');
+const defaultOutPath = resolve(__dirname, '..', 'docs', 'openapi.json');
+const outPath = outOverride ? resolve(outOverride) : defaultOutPath;
 writeFileSync(outPath, JSON.stringify(document, null, 2) + '\n', 'utf8');
 
 // Quick self-check summary.

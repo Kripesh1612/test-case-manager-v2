@@ -28,6 +28,7 @@
     "lint": "eslint utils middleware",
     "lint:fix": "eslint --fix utils middleware",
     "openapi": "node scripts/generate-openapi.mjs",
+    "openapi:check": "node scripts/openapi-check.mjs",
     "openapi:serve": "node scripts/serve-openapi.mjs",
     "test": "RATE_LIMIT_BURST=1 cypress run"
   },

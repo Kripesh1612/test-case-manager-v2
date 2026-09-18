@@ -94,6 +94,13 @@ jobs:
         # so it can fail fast without paying the boot + migrate cost.
         run: npm run test:unit
 
+      - name: OpenAPI stale check
+        # Tier3-PR-N. Re-generates docs/openapi.json to a temp file and
+        # diffs it against the committed one. Fails loudly if a schema
+        # changed without `npm run openapi` being re-run, instead of
+        # silently shipping a drifted contract.
+        run: npm run openapi:check
+
       - name: Apply Prisma migrations
         # `migrate deploy` is the non-interactive sibling of `migrate dev`:
         # it applies pending migrations and exits. No shadow DB needed, no
