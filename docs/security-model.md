@@ -135,16 +135,19 @@ how the suite runs in CI on every push.
 The **Closed by** column traces every post-v0 control back to its
 triggering finding. The full audit narrative — including the
 five-batch sweep, the issue lists, and the rationale for each fix —
-is in [`docs/DEFENSE_ANALYSIS.md`](./DEFENSE_ANALYSIS.md) (sections
-"10. Defensive mechanisms" and "13. Resolved issues").
+is in [`docs/audit-findings.md`](./audit-findings.md). Each batch
+section in that file carries the per-commit SHA, the itemised
+findings, and the cross-link to the matching STRIDE row in this
+catalogue.
 
 If a defence is challenged in review, the resolution chain is:
 
 1. Find the row in the table above.
 2. Read the **Closed by** cell to see which audit batch forced the
    control.
-3. Read the matching entry in `docs/DEFENSE_ANALYSIS.md` for the
-   rationale and the diff (commit hash) that introduced it.
+3. Open [`docs/audit-findings.md`](./audit-findings.md) and read the
+   matching batch section for the rationale and the commit SHA that
+   introduced the fix.
 
 This makes every defence either observable in code (file:line) or
 attributable to a documented decision — no "we meant to" rows.
