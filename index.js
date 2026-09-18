@@ -139,9 +139,32 @@ app.get('/visual', serveReact);
 // goes to the UI.
 app.use('/trash', trashRoutes);
 
-// Health check
+// Health check. The `client` block exposes the served JS bundle hash
+// and the dist mtime so a `curl /health` from anywhere can confirm
+// the running container's React build matches what the host has —
+// important because the Dockerfile bakes `client/dist` into the image
+// at build time and the host's dist can silently drift ahead of the
+// running container.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  const fs = require('fs');
+  const path = require('path');
+  let client = null;
+  try {
+    const distDir = path.join(__dirname, 'client', 'dist');
+    const htmlPath = path.join(distDir, 'index.html');
+    const stat = fs.statSync(htmlPath);
+    const html = fs.readFileSync(htmlPath, 'utf8');
+    const jsMatch = html.match(/\/assets\/(index-[^"]+\.js)/);
+    const cssMatch = html.match(/\/assets\/(index-[^"]+\.css)/);
+    client = {
+      bundle_js: jsMatch ? jsMatch[1] : null,
+      bundle_css: cssMatch ? cssMatch[1] : null,
+      dist_mtime: stat.mtime.toISOString(),
+    };
+  } catch (_) {
+    client = { error: 'client/dist not found' };
+  }
+  res.json({ status: 'ok', client });
 });
 
 // 404 handler for unmatched routes (must come after all real routes)
