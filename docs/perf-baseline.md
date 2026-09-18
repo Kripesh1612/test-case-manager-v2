@@ -3,7 +3,7 @@
 Measured load numbers for the running app, captured under realistic
 shape so the calibration can be re-run, repeated, and compared
 against. The numbers below were taken against the production-mode
-docker image on 2026-09-17 against a fresh database with ~20 seeded
+docker image on 2026-09-18 against a fresh database with ~20 seeded
 test cases.
 
 ## Test environment
@@ -44,16 +44,16 @@ response serialization for up to 50 rows".
 
 ```
 Latency (ms)
-  p50    : 136
-  p95    : 221
-  p99    : 255
-  max    : 1159
-  stdev  : 48
+  p50    : 154
+  p95    : 189
+  p99    : 196
+  max    : 1171
+  stdev  : 34.2
 Throughput
-  avg rps: 350.87
-  total  : 10,526 requests in 30 s
+  avg rps: 315.64
+  total  : 9,469 requests in 30 s
 Bandwidth
-  avg    : 15.9 MB/s outbound
+  avg    : 17.45 MB/s outbound
 Errors  : 0 non-2xx responses
 ```
 
@@ -63,16 +63,16 @@ The narrow read — primary key lookup, single row serialization.
 
 ```
 Latency (ms)
-  p50    : 48
-  p95    : 71
-  p99    : 82
-  max    : 291
-  stdev  : 14
+  p50    : 55
+  p95    : 69
+  p99    : 74
+  max    : 487
+  stdev  : 12.1
 Throughput
-  avg rps: 996
-  total  : 20,000 requests in 20 s
+  avg rps: 883.20
+  total  : 17,664 requests in 20 s
 Bandwidth
-  avg    : 615 kB/s outbound
+  avg    : 0.52 MB/s outbound
 Errors  : 0 non-2xx responses
 ```
 
@@ -83,11 +83,16 @@ No DB, no auth, pure Express.
 
 ```
 Latency (ms)
-  p50    : ~2
-  p95    : ~5
+  p50    : 19
+  p95    : 27
+  p99    : 28
+  max    : 619
+  stdev  : 8.9
 Throughput
-  avg rps: 5,260
-  total  : 105,000 requests in 20 s
+  avg rps: 4,897.86
+  total  : 97,947 requests in 20 s
+Bandwidth
+  avg    : 1.16 MB/s outbound
 Errors  : 0
 ```
 
@@ -95,11 +100,11 @@ Errors  : 0
 
 ```
                                   idle       after list+single+health
-  tcm-app memory:                 94.6 MiB   188.1 MiB
-  tcm-postgres memory:            ~30 MiB    44.1 MiB
+  tcm-app memory:                 94.6 MiB   162.2 MiB
+  tcm-postgres memory:            ~30 MiB    39.84 MiB
 ```
 
-The app's resident-set grows by roughly 2× under sustained 50-conn
+The app's resident-set grows by roughly 1.7× under sustained 50-conn
 load; this is V8 heap warmup, JIT compilation of the hot path, and
 the Postgres pool's connection state. It stabilises rather than
 climbing steadily across the test window — nothing here indicates an
@@ -112,10 +117,11 @@ inspection.
 **Do prove:**
 
 - The list / single endpoints serve a realistic admin/editor load
-  with p95 under 230 ms without any tuning.
-- The health check is two orders of magnitude cheaper than the auth-bearing
-  reads — there is a real cost to JWT verify + Prisma parse that the cheap
-  path correctly avoids.
+  with p95 under 200 ms without any tuning.
+- The health check is roughly two orders of magnitude cheaper than the
+  auth-bearing reads (p50 19 ms vs p50 154 ms on list) — there is a real
+  cost to JWT verify + Prisma parse that the cheap path correctly
+  avoids.
 - No 5xx under sustained concurrency; the only error responses observed
   during the tests were intentional 401s from one malformed-token probe.
 
