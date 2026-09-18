@@ -133,9 +133,17 @@ function BrandBackdrop() {
 // =============================================================================
 // Reusable field — preserves the data-cy contract the test suite queries
 // against (e.g. login-email, register-password, invite-name-input).
+//
+// Accessibility:
+//   - The `<label>` uses `htmlFor={id}` (explicit label association) so
+//     screen readers announce the field by its name when focused.
+//   - `id` flows through from the caller's `...registerField(...)` spread,
+//     so React Hook Form's generated IDs are picked up automatically.
+//     If no `id` is passed, we fall back to `useId()` — never emit an
+//     unlabeled input.
 // =============================================================================
 
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 
 type FieldProps = {
   label: string;
@@ -144,10 +152,12 @@ type FieldProps = {
   leadingIcon?: ReactNode;
 } & InputHTMLAttributes<HTMLInputElement>;
 
-export function Field({ label, hint, error, leadingIcon, ...inputProps }: FieldProps) {
+export function Field({ label, hint, error, leadingIcon, id, ...inputProps }: FieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-text">
+      <label htmlFor={fieldId} className="mb-1.5 block text-sm font-medium text-text">
         {label}
       </label>
       <div className="relative">
@@ -158,6 +168,7 @@ export function Field({ label, hint, error, leadingIcon, ...inputProps }: FieldP
         )}
         <input
           {...inputProps}
+          id={fieldId}
           className={`rg-input ${leadingIcon ? 'pl-9' : ''} ${
             error ? 'border-danger focus:border-danger focus:shadow-[0_0_0_3px_var(--color-danger-soft)]' : ''
           }`}

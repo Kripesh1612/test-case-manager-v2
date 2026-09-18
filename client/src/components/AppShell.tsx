@@ -285,6 +285,8 @@ function ProfileMenu({
       <button
         type="button"
         data-cy="profile-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => setOpen((s) => !s)}
         className="flex items-center gap-2.5 rounded-full border border-border bg-surface py-1 pl-1 pr-3 hover:bg-surface-hover transition-colors"
       >
@@ -298,6 +300,7 @@ function ProfileMenu({
       {open && (
         <div
           role="menu"
+          aria-label="Account"
           className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-surface shadow-pop overflow-hidden rg-fade-in"
         >
           <div className="px-4 py-3 border-b border-border-soft">
@@ -314,9 +317,10 @@ function ProfileMenu({
           </div>
           <button
             type="button"
+            role="menuitem"
             data-cy="logout-btn"
             onClick={onLogout}
-            className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover transition-colors"
+            className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm text-text hover:bg-surface-hover transition-colors focus:outline-none focus:bg-surface-hover"
           >
             <Icon.Logout size={16} />
             Log out
