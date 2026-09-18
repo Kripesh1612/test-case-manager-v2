@@ -15,6 +15,9 @@ one and the `Supersedes:` line links them.
 | Number | Title | Status |
 | ------ | ----- | ------ |
 | [0001](./0001-result-vs-run-state-model.md) | `TestCase.result` vs `TestRun.status` (derived mirror, not authoritative join) | Accepted |
+| [0002](./0002-scheduler-design.md) | In-process cron scheduler with optimistic-claim concurrency | Accepted |
+| [0003](./0003-webhook-signing.md) | Webhook signing (HMAC-SHA256) + SSRF guard + replay support | Accepted |
+| [0004](./0004-visual-regression-storage.md) | Visual regression — per-run before/after diff, no baseline vault | Accepted |
 
 ## How to add a new ADR
 
